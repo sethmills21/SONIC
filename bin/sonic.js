@@ -3,21 +3,27 @@
 import { search } from '../lib/search.js';
 import { Player } from '../lib/player.js';
 import { UI } from '../lib/ui.js';
-import { CHANNELS, getSuggestedChannel, resolveChannel } from '../lib/channels.js';
+import {
+  CHANNELS, ACTIVITIES,
+  getSuggestedChannel, getSuggestedActivity,
+  pickActivityQuery, resolveChannel
+} from '../lib/channels.js';
 import readline from 'node:readline';
 
 const ui = new UI();
 const player = new Player();
 let results = [];
 let currentTrack = null;
-let state = 'idle'; // idle | channel_pick | searching | results | playing | search_input
+let state = 'idle'; // idle | picker | searching | results | playing | search_input
 let source = 'youtube';
 
-// Selection cursors
-let channelCursor = 0;
+// Picker state
+let pickerTab = 'vibes'; // 'vibes' | 'activities'
+let vibesCursor = 0;
+let activityCursor = 0;
 let resultsCursor = 0;
 
-// Parse args: sonic [--sc] [channel|query]
+// Parse args
 const args = process.argv.slice(2);
 if (args.includes('--sc') || args.includes('--soundcloud')) {
   source = 'soundcloud';
@@ -32,7 +38,7 @@ function cleanup() {
 process.on('SIGINT', cleanup);
 process.on('SIGTERM', cleanup);
 
-// --- Keyboard (raw mode, single listener) ---
+// --- Keyboard ---
 
 function enableRawKeys() {
   if (process.stdin.isTTY && !process.stdin.isRaw) {
@@ -48,48 +54,63 @@ function disableRawKeys() {
   }
 }
 
-// Arrow keys come as escape sequences: \x1b[A (up), \x1b[B (down)
-function isUpArrow(key) { return key === '\x1b[A' || key === 'k'; }
-function isDownArrow(key) { return key === '\x1b[B' || key === 'j'; }
+function isUp(key) { return key === '\x1b[A' || key === 'k'; }
+function isDown(key) { return key === '\x1b[B' || key === 'j'; }
+function isLeft(key) { return key === '\x1b[D' || key === 'h'; }
+function isRight(key) { return key === '\x1b[C' || key === 'l'; }
 
 process.stdin.on('data', async (key) => {
   if (key === '\x03') { cleanup(); return; }
 
-  if (state === 'channel_pick') {
-    if (isUpArrow(key)) {
-      channelCursor = (channelCursor - 1 + CHANNELS.length) % CHANNELS.length;
-      renderChannelPicker();
+  if (state === 'picker') {
+    // Tab or left/right arrows switch between vibes and activities
+    if (key === '\t' || isLeft(key) || isRight(key)) {
+      pickerTab = pickerTab === 'vibes' ? 'activities' : 'vibes';
+      renderPicker();
       return;
     }
-    if (isDownArrow(key)) {
-      channelCursor = (channelCursor + 1) % CHANNELS.length;
-      renderChannelPicker();
+
+    const items = pickerTab === 'vibes' ? CHANNELS : ACTIVITIES;
+    const cursor = pickerTab === 'vibes' ? vibesCursor : activityCursor;
+
+    if (isUp(key)) {
+      const next = (cursor - 1 + items.length) % items.length;
+      if (pickerTab === 'vibes') vibesCursor = next;
+      else activityCursor = next;
+      renderPicker();
+      return;
+    }
+    if (isDown(key)) {
+      const next = (cursor + 1) % items.length;
+      if (pickerTab === 'vibes') vibesCursor = next;
+      else activityCursor = next;
+      renderPicker();
       return;
     }
     if (key === '\r' || key === '\n') {
-      await doSearch(CHANNELS[channelCursor].query);
+      const item = items[cursor];
+      const query = pickerTab === 'vibes' ? item.query : pickActivityQuery(item);
+      await doSearch(query);
       return;
     }
-    // Number keys still work as shortcuts
-    const ch = CHANNELS.find(c => c.key === key);
-    if (ch) {
-      await doSearch(ch.query);
+    // Number keys as shortcuts
+    const match = items.find(c => c.key === key);
+    if (match) {
+      const query = pickerTab === 'vibes' ? match.query : pickActivityQuery(match);
+      await doSearch(query);
       return;
     }
-    if (key === '/') {
-      promptSearch();
-      return;
-    }
+    if (key === '/') { promptSearch(); return; }
     if (key === 'q') { cleanup(); return; }
   }
 
   if (state === 'results') {
-    if (isUpArrow(key)) {
+    if (isUp(key)) {
       resultsCursor = (resultsCursor - 1 + results.length) % results.length;
       renderResultsList();
       return;
     }
-    if (isDownArrow(key)) {
+    if (isDown(key)) {
       resultsCursor = (resultsCursor + 1) % results.length;
       renderResultsList();
       return;
@@ -98,20 +119,13 @@ process.stdin.on('data', async (key) => {
       await playTrack(results[resultsCursor]);
       return;
     }
-    // Number keys still work
     const num = parseInt(key);
     if (num >= 1 && num <= results.length) {
       await playTrack(results[num - 1]);
       return;
     }
-    if (key === '/' || key === 's') {
-      promptSearch();
-      return;
-    }
-    if (key === 'b') {
-      showChannelPicker();
-      return;
-    }
+    if (key === '/' || key === 's') { promptSearch(); return; }
+    if (key === 'b') { showPicker(); return; }
     if (key === 'q') { cleanup(); return; }
   }
 
@@ -129,7 +143,7 @@ process.stdin.on('data', async (key) => {
     if (key === 'b') {
       ui.stopVisualizer();
       await player.stop();
-      showChannelPicker();
+      showPicker();
     }
     if (key === '[') await player.seekRelative(-10);
     if (key === ']') await player.seekRelative(10);
@@ -164,10 +178,12 @@ function renderPlaying() {
   process.stdout.write(out);
 }
 
-function renderChannelPicker() {
+function renderPicker() {
   ui.clear();
   process.stdout.write(ui.header());
-  process.stdout.write(ui.channelPicker(CHANNELS, channelCursor));
+  const cursor = pickerTab === 'vibes' ? vibesCursor : activityCursor;
+  const items = pickerTab === 'vibes' ? CHANNELS : ACTIVITIES;
+  process.stdout.write(ui.picker(items, cursor, pickerTab));
 }
 
 function renderResultsList() {
@@ -176,17 +192,18 @@ function renderResultsList() {
   process.stdout.write(ui.resultsList(results, resultsCursor));
 }
 
-// --- Channel picker ---
+// --- Picker ---
 
-function showChannelPicker() {
-  state = 'channel_pick';
-  channelCursor = getSuggestedChannel();
+function showPicker() {
+  state = 'picker';
+  vibesCursor = getSuggestedChannel();
+  activityCursor = getSuggestedActivity();
   ui.hideCursor();
   enableRawKeys();
-  renderChannelPicker();
+  renderPicker();
 }
 
-// --- Search ---
+// --- Search with loading animation ---
 
 async function doSearch(query) {
   state = 'searching';
@@ -196,15 +213,28 @@ async function doSearch(query) {
   process.stdout.write(ui.header());
 
   const label = source === 'soundcloud' ? 'soundcloud' : 'youtube';
+
+  // Animated loading with tips
+  const tips = [
+    'searching ' + label + '...',
+    'finding the best mixes...',
+    'curating your vibe...',
+    'almost there...',
+  ];
   let frame = 0;
+  let tipIdx = 0;
+  const tipSwap = setInterval(() => {
+    tipIdx = Math.min(tipIdx + 1, tips.length - 1);
+  }, 3000);
   const spin = setInterval(() => {
     ui.moveTo(4, 1);
-    process.stdout.write('\x1b[2K' + ui.spinner(frame++, `searching ${label}...`));
+    process.stdout.write('\x1b[2K' + ui.spinner(frame++, tips[tipIdx]));
   }, 80);
 
   try {
     results = await search(query, { source });
     clearInterval(spin);
+    clearInterval(tipSwap);
 
     if (results.length === 0) {
       ui.clear();
@@ -220,6 +250,7 @@ async function doSearch(query) {
     enableRawKeys();
   } catch (err) {
     clearInterval(spin);
+    clearInterval(tipSwap);
     ui.clear();
     process.stdout.write(ui.header());
     process.stdout.write(`\n  \x1b[31msearch failed:\x1b[0m ${err.message}\n`);
@@ -236,18 +267,31 @@ async function playTrack(track) {
   ui.clear();
   process.stdout.write(ui.header());
 
+  // Better loading with track info
+  const tips = [
+    'connecting...',
+    `loading "${track.title.slice(0, 35)}..."`,
+    'buffering audio...',
+    'starting playback...',
+  ];
   let frame = 0;
+  let tipIdx = 0;
+  const tipSwap = setInterval(() => {
+    tipIdx = Math.min(tipIdx + 1, tips.length - 1);
+  }, 2000);
   const spin = setInterval(() => {
     ui.moveTo(4, 1);
-    process.stdout.write('\x1b[2K' + ui.spinner(frame++, 'loading...'));
+    process.stdout.write('\x1b[2K' + ui.spinner(frame++, tips[tipIdx]));
   }, 80);
 
   try {
     await player.play(track.url);
     clearInterval(spin);
+    clearInterval(tipSwap);
     ui.startVisualizer(() => renderPlaying());
   } catch (err) {
     clearInterval(spin);
+    clearInterval(tipSwap);
     ui.clear();
     process.stdout.write(ui.header());
     process.stdout.write(`\n  \x1b[31mplayback error:\x1b[0m ${err.message}\n`);
@@ -282,7 +326,7 @@ function promptSearch() {
 player.on('ended', () => {
   if (state === 'playing') {
     ui.stopVisualizer();
-    showChannelPicker();
+    showPicker();
   }
 });
 
@@ -301,7 +345,7 @@ async function main() {
       await doSearch(queryArgs);
     }
   } else {
-    showChannelPicker();
+    showPicker();
   }
 }
 
