@@ -76,6 +76,7 @@ process.stdin.on('data', async (key) => {
     }
     if (key === '[') await player.seekRelative(-10);
     if (key === ']') await player.seekRelative(10);
+    if (key === 'v') ui.toggleVizMode();
     if (key === '-') await player.setVolume(player.volume - 10);
     if (key === '=' || key === '+') await player.setVolume(player.volume + 10);
     if (key === 'q') cleanup();
@@ -94,9 +95,14 @@ function renderPlaying() {
     out += ui.nowPlaying(currentTrack.title, currentTrack.channel, player.duration || currentTrack.duration, src);
   }
   out += '\n\n';
-  out += ui.renderBars();
+  const dur = player.duration || currentTrack?.duration;
+  if (ui.vizMode === 'tape') {
+    out += ui.renderTape(player.position, dur);
+  } else {
+    out += ui.renderBars();
+  }
   out += '\n\n';
-  out += ui.progressBar(player.position, player.duration || currentTrack?.duration);
+  out += ui.progressBar(player.position, dur);
   out += '\n\n';
   out += ui.controls(player.paused);
   process.stdout.write(out);
