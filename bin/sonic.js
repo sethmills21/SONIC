@@ -13,6 +13,10 @@ let currentTrack = null;
 let state = 'idle'; // idle | channel_pick | searching | results | playing | search_input
 let source = 'youtube';
 
+// Selection cursors
+let channelCursor = 0;
+let resultsCursor = 0;
+
 // Parse args: sonic [--sc] [channel|query]
 const args = process.argv.slice(2);
 if (args.includes('--sc') || args.includes('--soundcloud')) {
@@ -44,20 +48,32 @@ function disableRawKeys() {
   }
 }
 
+// Arrow keys come as escape sequences: \x1b[A (up), \x1b[B (down)
+function isUpArrow(key) { return key === '\x1b[A' || key === 'k'; }
+function isDownArrow(key) { return key === '\x1b[B' || key === 'j'; }
+
 process.stdin.on('data', async (key) => {
   if (key === '\x03') { cleanup(); return; }
 
   if (state === 'channel_pick') {
-    // Number keys pick a channel
+    if (isUpArrow(key)) {
+      channelCursor = (channelCursor - 1 + CHANNELS.length) % CHANNELS.length;
+      renderChannelPicker();
+      return;
+    }
+    if (isDownArrow(key)) {
+      channelCursor = (channelCursor + 1) % CHANNELS.length;
+      renderChannelPicker();
+      return;
+    }
+    if (key === '\r' || key === '\n') {
+      await doSearch(CHANNELS[channelCursor].query);
+      return;
+    }
+    // Number keys still work as shortcuts
     const ch = CHANNELS.find(c => c.key === key);
     if (ch) {
       await doSearch(ch.query);
-      return;
-    }
-    // Enter picks the suggested channel
-    if (key === '\r' || key === '\n') {
-      const idx = getSuggestedChannel();
-      await doSearch(CHANNELS[idx].query);
       return;
     }
     if (key === '/') {
@@ -68,13 +84,24 @@ process.stdin.on('data', async (key) => {
   }
 
   if (state === 'results') {
-    const num = parseInt(key);
-    if (num >= 1 && num <= results.length) {
-      await playTrack(results[num - 1]);
+    if (isUpArrow(key)) {
+      resultsCursor = (resultsCursor - 1 + results.length) % results.length;
+      renderResultsList();
+      return;
+    }
+    if (isDownArrow(key)) {
+      resultsCursor = (resultsCursor + 1) % results.length;
+      renderResultsList();
       return;
     }
     if (key === '\r' || key === '\n') {
-      await playTrack(results[0]);
+      await playTrack(results[resultsCursor]);
+      return;
+    }
+    // Number keys still work
+    const num = parseInt(key);
+    if (num >= 1 && num <= results.length) {
+      await playTrack(results[num - 1]);
       return;
     }
     if (key === '/' || key === 's') {
@@ -137,16 +164,26 @@ function renderPlaying() {
   process.stdout.write(out);
 }
 
+function renderChannelPicker() {
+  ui.clear();
+  process.stdout.write(ui.header());
+  process.stdout.write(ui.channelPicker(CHANNELS, channelCursor));
+}
+
+function renderResultsList() {
+  ui.clear();
+  process.stdout.write(ui.header());
+  process.stdout.write(ui.resultsList(results, resultsCursor));
+}
+
 // --- Channel picker ---
 
 function showChannelPicker() {
   state = 'channel_pick';
+  channelCursor = getSuggestedChannel();
   ui.hideCursor();
   enableRawKeys();
-
-  ui.clear();
-  process.stdout.write(ui.header());
-  process.stdout.write(ui.channelPicker(CHANNELS, getSuggestedChannel()));
+  renderChannelPicker();
 }
 
 // --- Search ---
@@ -178,9 +215,8 @@ async function doSearch(query) {
     }
 
     state = 'results';
-    ui.clear();
-    process.stdout.write(ui.header());
-    process.stdout.write(ui.resultsList(results));
+    resultsCursor = 0;
+    renderResultsList();
     enableRawKeys();
   } catch (err) {
     clearInterval(spin);
@@ -256,18 +292,15 @@ async function main() {
   ui.hideCursor();
 
   if (queryArgs) {
-    // Check if it's a channel name/alias first
     const channel = resolveChannel(queryArgs);
     if (channel) {
       enableRawKeys();
       await doSearch(channel.query);
     } else {
-      // Treat as a raw search query
       enableRawKeys();
       await doSearch(queryArgs);
     }
   } else {
-    // No args → show the vibe picker
     showChannelPicker();
   }
 }
