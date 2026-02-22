@@ -9,6 +9,7 @@ import {
   pickActivityQuery, resolveChannel
 } from '../lib/channels.js';
 import readline from 'node:readline';
+import { exec } from 'node:child_process';
 
 const ui = new UI();
 const player = new Player();
@@ -148,6 +149,9 @@ process.stdin.on('data', async (key) => {
     if (key === '[') await player.seekRelative(-10);
     if (key === ']') await player.seekRelative(10);
     if (key === 'v') ui.toggleVizMode();
+    if (key === 'o' && currentTrack) {
+      exec(`open "${currentTrack.url}"`);
+    }
     if (key === '-') await player.setVolume(player.volume - 10);
     if (key === '=' || key === '+') await player.setVolume(player.volume + 10);
     if (key === 'q') cleanup();
@@ -264,34 +268,19 @@ async function playTrack(track) {
   ui.hideCursor();
   enableRawKeys();
 
-  ui.clear();
-  process.stdout.write(ui.header());
-
-  // Better loading with track info
-  const tips = [
-    'connecting...',
-    `loading "${track.title.slice(0, 35)}..."`,
-    'buffering audio...',
-    'starting playback...',
-  ];
+  // Full-screen animated loading
   let frame = 0;
-  let tipIdx = 0;
-  const tipSwap = setInterval(() => {
-    tipIdx = Math.min(tipIdx + 1, tips.length - 1);
-  }, 2000);
-  const spin = setInterval(() => {
-    ui.moveTo(4, 1);
-    process.stdout.write('\x1b[2K' + ui.spinner(frame++, tips[tipIdx]));
-  }, 80);
+  const loadingAnim = setInterval(() => {
+    process.stdout.write('\x1b[2J\x1b[H');
+    process.stdout.write(ui.loadingScreen(frame++, track));
+  }, 60);
 
   try {
     await player.play(track.url);
-    clearInterval(spin);
-    clearInterval(tipSwap);
+    clearInterval(loadingAnim);
     ui.startVisualizer(() => renderPlaying());
   } catch (err) {
-    clearInterval(spin);
-    clearInterval(tipSwap);
+    clearInterval(loadingAnim);
     ui.clear();
     process.stdout.write(ui.header());
     process.stdout.write(`\n  \x1b[31mplayback error:\x1b[0m ${err.message}\n`);
