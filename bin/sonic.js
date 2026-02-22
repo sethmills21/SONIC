@@ -3,21 +3,22 @@
 import { search } from '../lib/search.js';
 import { Player } from '../lib/player.js';
 import { UI } from '../lib/ui.js';
+import { CHANNELS, getSuggestedChannel, resolveChannel } from '../lib/channels.js';
 import readline from 'node:readline';
 
 const ui = new UI();
 const player = new Player();
 let results = [];
 let currentTrack = null;
-let state = 'idle'; // idle | searching | results | playing | search_input
+let state = 'idle'; // idle | channel_pick | searching | results | playing | search_input
 let source = 'youtube';
 
-// Parse args: sonic [--sc] <query>
+// Parse args: sonic [--sc] [channel|query]
 const args = process.argv.slice(2);
 if (args.includes('--sc') || args.includes('--soundcloud')) {
   source = 'soundcloud';
 }
-const initialQuery = args.filter(a => !a.startsWith('--')).join(' ').trim();
+const queryArgs = args.filter(a => !a.startsWith('--')).join(' ').trim();
 
 function cleanup() {
   ui.cleanup();
@@ -46,6 +47,26 @@ function disableRawKeys() {
 process.stdin.on('data', async (key) => {
   if (key === '\x03') { cleanup(); return; }
 
+  if (state === 'channel_pick') {
+    // Number keys pick a channel
+    const ch = CHANNELS.find(c => c.key === key);
+    if (ch) {
+      await doSearch(ch.query);
+      return;
+    }
+    // Enter picks the suggested channel
+    if (key === '\r' || key === '\n') {
+      const idx = getSuggestedChannel();
+      await doSearch(CHANNELS[idx].query);
+      return;
+    }
+    if (key === '/') {
+      promptSearch();
+      return;
+    }
+    if (key === 'q') { cleanup(); return; }
+  }
+
   if (state === 'results') {
     const num = parseInt(key);
     if (num >= 1 && num <= results.length) {
@@ -58,6 +79,10 @@ process.stdin.on('data', async (key) => {
     }
     if (key === '/' || key === 's') {
       promptSearch();
+      return;
+    }
+    if (key === 'b') {
+      showChannelPicker();
       return;
     }
     if (key === 'q') { cleanup(); return; }
@@ -74,6 +99,11 @@ process.stdin.on('data', async (key) => {
       await player.stop();
       promptSearch();
     }
+    if (key === 'b') {
+      ui.stopVisualizer();
+      await player.stop();
+      showChannelPicker();
+    }
     if (key === '[') await player.seekRelative(-10);
     if (key === ']') await player.seekRelative(10);
     if (key === 'v') ui.toggleVizMode();
@@ -86,7 +116,6 @@ process.stdin.on('data', async (key) => {
 // --- Render ---
 
 function renderPlaying() {
-  ui.moveTo(1, 1);
   let out = '\x1b[2J\x1b[H';
   out += ui.header();
   out += '\n';
@@ -108,11 +137,24 @@ function renderPlaying() {
   process.stdout.write(out);
 }
 
+// --- Channel picker ---
+
+function showChannelPicker() {
+  state = 'channel_pick';
+  ui.hideCursor();
+  enableRawKeys();
+
+  ui.clear();
+  process.stdout.write(ui.header());
+  process.stdout.write(ui.channelPicker(CHANNELS, getSuggestedChannel()));
+}
+
 // --- Search ---
 
 async function doSearch(query) {
   state = 'searching';
   ui.hideCursor();
+  enableRawKeys();
   ui.clear();
   process.stdout.write(ui.header());
 
@@ -120,7 +162,7 @@ async function doSearch(query) {
   let frame = 0;
   const spin = setInterval(() => {
     ui.moveTo(4, 1);
-    process.stdout.write('\x1b[2K' + ui.spinner(frame++, `searching ${label} for "${query}"...`));
+    process.stdout.write('\x1b[2K' + ui.spinner(frame++, `searching ${label}...`));
   }, 80);
 
   try {
@@ -191,7 +233,7 @@ function promptSearch() {
     output: process.stdout
   });
 
-  rl.question('  \x1b[90mwhat do you want to hear?\x1b[0m\n  \x1b[97m▸\x1b[0m ', (answer) => {
+  rl.question('  \x1b[90mwhat do you want to hear?\x1b[0m\n  \x1b[97m\u25b8\x1b[0m ', (answer) => {
     rl.close();
     const q = answer.trim();
     if (!q) { promptSearch(); return; }
@@ -204,7 +246,7 @@ function promptSearch() {
 player.on('ended', () => {
   if (state === 'playing') {
     ui.stopVisualizer();
-    promptSearch();
+    showChannelPicker();
   }
 });
 
@@ -213,11 +255,20 @@ player.on('ended', () => {
 async function main() {
   ui.hideCursor();
 
-  if (initialQuery) {
-    enableRawKeys();
-    await doSearch(initialQuery);
+  if (queryArgs) {
+    // Check if it's a channel name/alias first
+    const channel = resolveChannel(queryArgs);
+    if (channel) {
+      enableRawKeys();
+      await doSearch(channel.query);
+    } else {
+      // Treat as a raw search query
+      enableRawKeys();
+      await doSearch(queryArgs);
+    }
   } else {
-    promptSearch();
+    // No args → show the vibe picker
+    showChannelPicker();
   }
 }
 
