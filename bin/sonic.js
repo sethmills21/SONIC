@@ -1,0 +1,222 @@
+#!/usr/bin/env node
+
+import { search } from '../lib/search.js';
+import { Player } from '../lib/player.js';
+import { UI } from '../lib/ui.js';
+import readline from 'node:readline';
+
+const ui = new UI();
+const player = new Player();
+let results = [];
+let currentTrack = null;
+let state = 'idle'; // idle | searching | results | playing | search_input
+let source = 'youtube';
+
+// Parse args: sonic [--sc] <query>
+const args = process.argv.slice(2);
+if (args.includes('--sc') || args.includes('--soundcloud')) {
+  source = 'soundcloud';
+}
+const initialQuery = args.filter(a => !a.startsWith('--')).join(' ').trim();
+
+function cleanup() {
+  ui.cleanup();
+  player.stop().then(() => process.exit(0)).catch(() => process.exit(0));
+}
+
+process.on('SIGINT', cleanup);
+process.on('SIGTERM', cleanup);
+
+// --- Keyboard (raw mode, single listener) ---
+
+function enableRawKeys() {
+  if (process.stdin.isTTY && !process.stdin.isRaw) {
+    process.stdin.setRawMode(true);
+  }
+  process.stdin.resume();
+  process.stdin.setEncoding('utf8');
+}
+
+function disableRawKeys() {
+  if (process.stdin.isTTY && process.stdin.isRaw) {
+    process.stdin.setRawMode(false);
+  }
+}
+
+process.stdin.on('data', async (key) => {
+  if (key === '\x03') { cleanup(); return; }
+
+  if (state === 'results') {
+    const num = parseInt(key);
+    if (num >= 1 && num <= results.length) {
+      await playTrack(results[num - 1]);
+      return;
+    }
+    if (key === '\r' || key === '\n') {
+      await playTrack(results[0]);
+      return;
+    }
+    if (key === '/' || key === 's') {
+      promptSearch();
+      return;
+    }
+    if (key === 'q') { cleanup(); return; }
+  }
+
+  if (state === 'playing') {
+    if (key === ' ') {
+      await player.togglePause();
+      if (player.paused) ui.pauseVisualizer();
+      else ui.resumeVisualizer();
+    }
+    if (key === '/') {
+      ui.stopVisualizer();
+      await player.stop();
+      promptSearch();
+    }
+    if (key === '[') await player.seekRelative(-10);
+    if (key === ']') await player.seekRelative(10);
+    if (key === '-') await player.setVolume(player.volume - 10);
+    if (key === '=' || key === '+') await player.setVolume(player.volume + 10);
+    if (key === 'q') cleanup();
+  }
+});
+
+// --- Render ---
+
+function renderPlaying() {
+  ui.moveTo(1, 1);
+  let out = '\x1b[2J\x1b[H';
+  out += ui.header();
+  out += '\n';
+  if (currentTrack) {
+    const src = currentTrack.source === 'soundcloud' ? 'soundcloud' : 'youtube';
+    out += ui.nowPlaying(currentTrack.title, currentTrack.channel, player.duration || currentTrack.duration, src);
+  }
+  out += '\n\n';
+  out += ui.renderBars();
+  out += '\n\n';
+  out += ui.progressBar(player.position, player.duration || currentTrack?.duration);
+  out += '\n\n';
+  out += ui.controls(player.paused);
+  process.stdout.write(out);
+}
+
+// --- Search ---
+
+async function doSearch(query) {
+  state = 'searching';
+  ui.hideCursor();
+  ui.clear();
+  process.stdout.write(ui.header());
+
+  const label = source === 'soundcloud' ? 'soundcloud' : 'youtube';
+  let frame = 0;
+  const spin = setInterval(() => {
+    ui.moveTo(4, 1);
+    process.stdout.write('\x1b[2K' + ui.spinner(frame++, `searching ${label} for "${query}"...`));
+  }, 80);
+
+  try {
+    results = await search(query, { source });
+    clearInterval(spin);
+
+    if (results.length === 0) {
+      ui.clear();
+      process.stdout.write(ui.header());
+      process.stdout.write(`\n  \x1b[31mno results found\x1b[0m\n`);
+      promptSearch();
+      return;
+    }
+
+    state = 'results';
+    ui.clear();
+    process.stdout.write(ui.header());
+    process.stdout.write(ui.resultsList(results));
+    enableRawKeys();
+  } catch (err) {
+    clearInterval(spin);
+    ui.clear();
+    process.stdout.write(ui.header());
+    process.stdout.write(`\n  \x1b[31msearch failed:\x1b[0m ${err.message}\n`);
+    promptSearch();
+  }
+}
+
+async function playTrack(track) {
+  currentTrack = track;
+  state = 'playing';
+  ui.hideCursor();
+  enableRawKeys();
+
+  ui.clear();
+  process.stdout.write(ui.header());
+
+  let frame = 0;
+  const spin = setInterval(() => {
+    ui.moveTo(4, 1);
+    process.stdout.write('\x1b[2K' + ui.spinner(frame++, 'loading...'));
+  }, 80);
+
+  try {
+    await player.play(track.url);
+    clearInterval(spin);
+    ui.startVisualizer(() => renderPlaying());
+  } catch (err) {
+    clearInterval(spin);
+    ui.clear();
+    process.stdout.write(ui.header());
+    process.stdout.write(`\n  \x1b[31mplayback error:\x1b[0m ${err.message}\n`);
+    setTimeout(() => promptSearch(), 2000);
+  }
+}
+
+function promptSearch() {
+  state = 'search_input';
+  ui.stopVisualizer();
+  disableRawKeys();
+  ui.showCursor();
+
+  ui.clear();
+  process.stdout.write(ui.header() + '\n');
+
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+
+  rl.question('  \x1b[90mwhat do you want to hear?\x1b[0m\n  \x1b[97m▸\x1b[0m ', (answer) => {
+    rl.close();
+    const q = answer.trim();
+    if (!q) { promptSearch(); return; }
+    doSearch(q);
+  });
+}
+
+// --- Player events ---
+
+player.on('ended', () => {
+  if (state === 'playing') {
+    ui.stopVisualizer();
+    promptSearch();
+  }
+});
+
+// --- Main ---
+
+async function main() {
+  ui.hideCursor();
+
+  if (initialQuery) {
+    enableRawKeys();
+    await doSearch(initialQuery);
+  } else {
+    promptSearch();
+  }
+}
+
+main().catch((err) => {
+  ui.cleanup();
+  console.error(err);
+  process.exit(1);
+});

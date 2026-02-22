@@ -1,0 +1,12 @@
+{
+  "name": "sonic-cli",
+  "version": "0.1.0",
+  "description": "Stream music from your terminal",
+  "type": "module",
+  "bin": {
+    "sonic": "./bin/sonic.js"
+  },
+  "dependencies": {
+    "chalk": "^5.4.1"
+  }
+}
