@@ -274,15 +274,36 @@ async function playTrack(track) {
   ui.hideCursor();
   enableRawKeys();
 
-  // Full-screen animated loading
+  // Loading animation with stage tracking
   let frame = 0;
+  let loadingStage = 'connecting';
   const loadingAnim = setInterval(() => {
     process.stdout.write('\x1b[2J\x1b[H');
-    process.stdout.write(ui.loadingScreen(frame++, track, source));
+    process.stdout.write(ui.loadingScreen(frame++, track, source, loadingStage));
   }, 60);
 
   try {
+    // Stage 1: connect to mpv socket
     await player.play(track.url);
+    loadingStage = 'buffering';
+
+    // Stage 2: wait for actual audio playback (position > 0 means audio is flowing)
+    await new Promise((resolve, reject) => {
+      let checks = 0;
+      const poll = setInterval(() => {
+        if (player.position > 0.5 || player.duration > 0) {
+          clearInterval(poll);
+          loadingStage = 'ready';
+          // Brief pause to show "ready" state before transitioning
+          setTimeout(resolve, 400);
+        }
+        if (++checks > 300) { // 30 second timeout
+          clearInterval(poll);
+          resolve(); // proceed anyway, might just be a slow stream
+        }
+      }, 100);
+    });
+
     clearInterval(loadingAnim);
     ui.startVisualizer(() => renderPlaying());
   } catch (err) {
