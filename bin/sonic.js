@@ -162,16 +162,22 @@ process.stdin.on('data', async (key) => {
 
 function renderPlaying() {
   let out = '\x1b[2J\x1b[H';
-  out += ui.header();
+  const src = currentTrack?.source === 'soundcloud' ? 'soundcloud' : 'youtube';
+  out += ui.header(src);
   out += '\n';
   if (currentTrack) {
-    const src = currentTrack.source === 'soundcloud' ? 'soundcloud' : 'youtube';
     out += ui.nowPlaying(currentTrack.title, currentTrack.channel, player.duration || currentTrack.duration, src);
   }
   out += '\n\n';
   const dur = player.duration || currentTrack?.duration;
   if (ui.vizMode === 'tape') {
     out += ui.renderTape(player.position, dur);
+  } else if (ui.vizMode === 'wave') {
+    out += ui.renderWaveform();
+  } else if (ui.vizMode === 'rain') {
+    out += ui.renderRain();
+  } else if (ui.vizMode === 'flame') {
+    out += ui.renderFlame();
   } else {
     out += ui.renderBars();
   }
@@ -184,7 +190,7 @@ function renderPlaying() {
 
 function renderPicker() {
   ui.clear();
-  process.stdout.write(ui.header());
+  process.stdout.write(ui.header(source));
   const cursor = pickerTab === 'vibes' ? vibesCursor : activityCursor;
   const items = pickerTab === 'vibes' ? CHANNELS : ACTIVITIES;
   process.stdout.write(ui.picker(items, cursor, pickerTab));
@@ -192,7 +198,7 @@ function renderPicker() {
 
 function renderResultsList() {
   ui.clear();
-  process.stdout.write(ui.header());
+  process.stdout.write(ui.header(source));
   process.stdout.write(ui.resultsList(results, resultsCursor));
 }
 
@@ -214,7 +220,7 @@ async function doSearch(query) {
   ui.hideCursor();
   enableRawKeys();
   ui.clear();
-  process.stdout.write(ui.header());
+  process.stdout.write(ui.header(source));
 
   const label = source === 'soundcloud' ? 'soundcloud' : 'youtube';
 
@@ -242,7 +248,7 @@ async function doSearch(query) {
 
     if (results.length === 0) {
       ui.clear();
-      process.stdout.write(ui.header());
+      process.stdout.write(ui.header(source));
       process.stdout.write(`\n  \x1b[31mno results found\x1b[0m\n`);
       promptSearch();
       return;
@@ -256,7 +262,7 @@ async function doSearch(query) {
     clearInterval(spin);
     clearInterval(tipSwap);
     ui.clear();
-    process.stdout.write(ui.header());
+    process.stdout.write(ui.header(source));
     process.stdout.write(`\n  \x1b[31msearch failed:\x1b[0m ${err.message}\n`);
     promptSearch();
   }
@@ -272,7 +278,7 @@ async function playTrack(track) {
   let frame = 0;
   const loadingAnim = setInterval(() => {
     process.stdout.write('\x1b[2J\x1b[H');
-    process.stdout.write(ui.loadingScreen(frame++, track));
+    process.stdout.write(ui.loadingScreen(frame++, track, source));
   }, 60);
 
   try {
@@ -282,7 +288,7 @@ async function playTrack(track) {
   } catch (err) {
     clearInterval(loadingAnim);
     ui.clear();
-    process.stdout.write(ui.header());
+    process.stdout.write(ui.header(source));
     process.stdout.write(`\n  \x1b[31mplayback error:\x1b[0m ${err.message}\n`);
     setTimeout(() => promptSearch(), 2000);
   }
@@ -295,7 +301,7 @@ function promptSearch() {
   ui.showCursor();
 
   ui.clear();
-  process.stdout.write(ui.header() + '\n');
+  process.stdout.write(ui.header(source) + '\n');
 
   const rl = readline.createInterface({
     input: process.stdin,
