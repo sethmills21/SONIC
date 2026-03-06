@@ -10,6 +10,7 @@ Sonic is a terminal music player with a theatrical TUI. It is currently YouTube-
 - `mpv` for audio playback
 - plain Node.js ESM for the CLI runtime
 - `chalk` for color and terminal styling
+- a persisted local store for favorites, recents, theme, and playback defaults
 
 SoundCloud search exists, but treat it as experimental. The main product direction is a polished, publishable GitHub project with a strong setup story and a clear line between fun UX and risky service creep.
 
@@ -49,6 +50,7 @@ lib/channels.js   curated channels and activities
 lib/ui.js         terminal UI, header, lists, visualizers
 lib/system.js     dependency checks, help text, safe external opening
 lib/store.js      persistent local config, favorites, recents
+lib/themes.js     curated theme system and palette registry
 ```
 
 ## Working Rules
@@ -57,6 +59,7 @@ lib/store.js      persistent local config, favorites, recents
 - Keep dependencies minimal unless there is a strong reason otherwise
 - Prefer small, obvious modules over framework-style abstractions
 - Preserve keyboard-first flows when changing the UI
+- Keep themes cohesive across header, lists, playback, and visualizers
 - If you change playback behavior, manually smoke-test the interactive flow
 - If you add a new service, document the auth, setup, and legal constraints in `README.md`
 - Keep project-level `CLAUDE.md` and `AGENTS.md` checked into git. Ignore machine-local agent config elsewhere, not the repo contract files.

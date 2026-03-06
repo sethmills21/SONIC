@@ -71,6 +71,7 @@ let resultsMeta = {
 };
 
 ui.vizMode = store.config.vizMode;
+ui.setTheme(store.config.theme);
 player.volume = store.config.volume;
 
 if (args.includes('--sc') || args.includes('--soundcloud')) {
@@ -146,6 +147,30 @@ function setSequenceFromList(list, index) {
 function cycleSource() {
   source = source === 'youtube' ? 'soundcloud' : 'youtube';
   persistConfig({ defaultSource: source });
+}
+
+function cycleThemeInApp(direction = 1) {
+  ui.cycleTheme(direction);
+  persistConfig({ theme: ui.themeName });
+
+  if (state === 'picker') {
+    renderPicker();
+    return;
+  }
+
+  if (state === 'results') {
+    renderResultsList();
+    return;
+  }
+
+  if (state === 'playing') {
+    renderPlaying();
+    return;
+  }
+
+  if (state === 'search_input') {
+    promptSearch();
+  }
 }
 
 function enableRawKeys() {
@@ -257,7 +282,7 @@ function showFavorites() {
     subtitle: `${store.favorites.length} saved track${store.favorites.length === 1 ? '' : 's'}`,
     kind: 'favorites',
     emptyMessage: 'no favorites yet. press f while browsing or playing to save one.',
-    footer: 'enter play · f unfavorite · / search · b back · m source · q quit'
+    footer: 'enter play · f unfavorite · / search · b back · m source · t theme · q quit'
   });
 }
 
@@ -267,7 +292,7 @@ function showRecents() {
     subtitle: `${store.recents.length} recent track${store.recents.length === 1 ? '' : 's'}`,
     kind: 'recents',
     emptyMessage: 'no recents yet. play something and it will show up here.',
-    footer: 'enter play · f favorite · / search · b back · m source · q quit'
+    footer: 'enter play · f favorite · / search · b back · m source · t theme · q quit'
   });
 }
 
@@ -309,7 +334,7 @@ async function doSearch(query) {
       subtitle: `${label} · ${query}`,
       kind: 'search',
       emptyMessage: `no ${label} results for “${query}”.`,
-      footer: 'enter play · f favorite · / search · b back · m source · q quit'
+      footer: 'enter play · f favorite · / search · b back · m source · t theme · q quit'
     });
   } catch (err) {
     clearInterval(spin);
@@ -420,7 +445,7 @@ function promptSearch() {
     output: process.stdout
   });
 
-  rl.question('  \x1b[90mwhat do you want to hear?\x1b[0m\n  \x1b[97m\u25b8\x1b[0m ', (answer) => {
+  rl.question(ui.searchPrompt(), (answer) => {
     rl.close();
     const query = answer.trim();
     if (!query) {
@@ -498,6 +523,11 @@ process.stdin.on('data', async (key) => {
       return;
     }
 
+    if (key === 't' || key === 'T') {
+      cycleThemeInApp(key === 'T' ? -1 : 1);
+      return;
+    }
+
     if (key === 'q') {
       cleanup(0);
     }
@@ -515,6 +545,10 @@ process.stdin.on('data', async (key) => {
       }
       if (key === 'm') {
         await rerunCurrentQueryWithNextSource();
+        return;
+      }
+      if (key === 't' || key === 'T') {
+        cycleThemeInApp(key === 'T' ? -1 : 1);
         return;
       }
       if (key === 'q') {
@@ -567,6 +601,11 @@ process.stdin.on('data', async (key) => {
       return;
     }
 
+    if (key === 't' || key === 'T') {
+      cycleThemeInApp(key === 'T' ? -1 : 1);
+      return;
+    }
+
     if (key === 'q') {
       cleanup(0);
     }
@@ -608,6 +647,11 @@ process.stdin.on('data', async (key) => {
       ui.toggleVizMode();
       persistConfig({ vizMode: ui.vizMode });
       renderPlaying();
+      return;
+    }
+
+    if (key === 't' || key === 'T') {
+      cycleThemeInApp(key === 'T' ? -1 : 1);
       return;
     }
 

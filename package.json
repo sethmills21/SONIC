@@ -17,7 +17,7 @@
   ],
   "scripts": {
     "start": "node ./bin/sonic.js",
-    "check": "node --check bin/sonic.js && node --check lib/search.js && node --check lib/player.js && node --check lib/channels.js && node --check lib/ui.js && node --check lib/system.js && node --check lib/store.js",
+    "check": "node --check bin/sonic.js && node --check lib/search.js && node --check lib/player.js && node --check lib/channels.js && node --check lib/ui.js && node --check lib/system.js && node --check lib/store.js && node --check lib/themes.js",
     "help": "node ./bin/sonic.js --help",
     "doctor": "node ./bin/sonic.js doctor"
   },

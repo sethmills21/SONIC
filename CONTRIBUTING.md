@@ -37,6 +37,7 @@ Manual smoke-test checklist:
 - search returns results
 - favorites persist
 - recents persist
+- theme changes persist
 - a selected result starts playback
 - queue next/previous works
 - pause/resume works

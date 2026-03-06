@@ -13,6 +13,7 @@ Make Sonic feel like a real terminal product, not a code sketch. Favor changes t
 - `mpv` audio playback
 - curated vibes and activity presets
 - expressive terminal UI and visualizers
+- switchable curated themes with a persisted default
 - experimental SoundCloud search
 
 ## Commands
@@ -42,6 +43,7 @@ lib/channels.js   content presets
 lib/ui.js         TUI rendering
 lib/system.js     system checks and safe URL opening
 lib/store.js      local store for config, favorites, recents
+lib/themes.js     theme registry and palette helpers
 ```
 
 ## Guardrails
@@ -53,6 +55,7 @@ lib/store.js      local store for config, favorites, recents
 - prefer YouTube-first improvements over speculative multi-service work
 - if you add another service, explain the API/auth/legal model in `README.md`
 - keep project-level `CLAUDE.md` and `AGENTS.md` versioned in git; do not hide them in `.gitignore`
+- if you touch theme work, keep the identity strong across the full TUI, not just the header
 
 ## Inspiration
 

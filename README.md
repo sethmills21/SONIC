@@ -12,6 +12,7 @@ Today it is a small Node CLI powered by `yt-dlp` for search/URL resolution and `
 - Save favorites and revisit recent plays
 - Carry a real next-track queue through a result list
 - Run `sonic doctor` to verify local setup
+- Switch between curated themes and persist your favorite one
 - Switch between multiple ASCII visualizers during playback
 - Open the current track in the browser
 - Experimental SoundCloud search via `--soundcloud`
@@ -79,6 +80,7 @@ sonic "lofi"
 - `f`: open favorites in picker, favorite/unfavorite in results/playback
 - `r`: open recents
 - `m`: switch search source
+- `t` / `T`: next or previous theme
 - `b`: go back to picker
 - `Space`: pause or resume
 - `n` / `p`: next or previous in the current queue
@@ -99,11 +101,23 @@ Sonic persists local state in:
 That store currently holds:
 
 - default source
+- theme
 - default visualizer
 - volume
 - search limit
 - favorites
 - recents
+
+## Themes
+
+Sonic currently ships with four themes:
+
+- `Neon Night`: the original rainbow/night-session default
+- `Sunset Cassette`: warm retro tape-deck energy
+- `Ice Glass`: cool chrome and plasma blues
+- `Ember Void`: molten orange, red, and magenta
+
+Use `t` for the next theme and `T` for the previous one from the picker, results, or playback screens.
 
 For now, editing the file directly is the easiest way to tweak defaults beyond the live keyboard controls.
 
@@ -117,6 +131,7 @@ lib/channels.js   curated vibe and activity presets
 lib/ui.js         terminal rendering and visualizers
 lib/system.js     dependency checks, help output, safe URL opening
 lib/store.js      persistent local config, favorites, and recents
+lib/themes.js     curated theme registry and theme cycling helpers
 ```
 
 ## API And Service Strategy
