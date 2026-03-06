@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+import readline from 'node:readline';
+import { readFileSync } from 'node:fs';
+
 import { search } from '../lib/search.js';
 import { Player } from '../lib/player.js';
 import { UI } from '../lib/ui.js';
@@ -8,38 +11,142 @@ import {
   getSuggestedChannel, getSuggestedActivity,
   pickActivityQuery, resolveChannel
 } from '../lib/channels.js';
-import readline from 'node:readline';
-import { exec } from 'node:child_process';
+import {
+  addRecent,
+  getStorePaths,
+  getTrackKey,
+  isFavorite,
+  loadStore,
+  saveStore,
+  toggleFavorite,
+  updateConfig
+} from '../lib/store.js';
+import {
+  buildDoctorReport,
+  formatDependencyHelp,
+  getMissingDependencies,
+  openExternal,
+  printHelp
+} from '../lib/system.js';
+
+const packageJson = JSON.parse(
+  readFileSync(new URL('../package.json', import.meta.url), 'utf8')
+);
+const version = packageJson.version;
+const args = process.argv.slice(2);
+const doctorMode = args.includes('--doctor') || (args.length === 1 && args[0] === 'doctor');
+
+if (args.includes('--help') || args.includes('-h')) {
+  printHelp(version);
+  process.exit(0);
+}
+
+if (args.includes('--version') || args.includes('-v')) {
+  console.log(version);
+  process.exit(0);
+}
+
+const store = loadStore();
+saveStore(store);
+
+if (doctorMode) {
+  console.log(buildDoctorReport({ version, store, storePaths: getStorePaths() }));
+  process.exit(0);
+}
 
 const ui = new UI();
 const player = new Player();
+
 let results = [];
 let currentTrack = null;
+let currentQuery = '';
 let state = 'idle'; // idle | picker | searching | results | playing | search_input
-let source = 'youtube';
+let source = store.config.defaultSource;
+let queue = [];
+let history = [];
+let resultsMeta = {
+  title: 'search results',
+  subtitle: '',
+  kind: 'search'
+};
 
-// Picker state
-let pickerTab = 'vibes'; // 'vibes' | 'activities'
+ui.vizMode = store.config.vizMode;
+player.volume = store.config.volume;
+
+if (args.includes('--sc') || args.includes('--soundcloud')) {
+  source = 'soundcloud';
+}
+
+let pickerTab = 'vibes';
 let vibesCursor = 0;
 let activityCursor = 0;
 let resultsCursor = 0;
 
-// Parse args
-const args = process.argv.slice(2);
-if (args.includes('--sc') || args.includes('--soundcloud')) {
-  source = 'soundcloud';
-}
-const queryArgs = args.filter(a => !a.startsWith('--')).join(' ').trim();
+const queryArgs = args
+  .filter((arg) => !arg.startsWith('--'))
+  .filter((arg) => arg !== 'doctor')
+  .join(' ')
+  .trim();
 
-function cleanup() {
+function cleanup(exitCode = 0) {
   ui.cleanup();
-  player.stop().then(() => process.exit(0)).catch(() => process.exit(0));
+  player.stop().then(() => process.exit(exitCode)).catch(() => process.exit(exitCode));
 }
 
-process.on('SIGINT', cleanup);
-process.on('SIGTERM', cleanup);
+process.on('SIGINT', () => cleanup(0));
+process.on('SIGTERM', () => cleanup(0));
 
-// --- Keyboard ---
+function saveAppState() {
+  saveStore(store);
+}
+
+function persistConfig(partial) {
+  updateConfig(store, partial);
+  saveAppState();
+}
+
+function hydrateTrack(track) {
+  return {
+    ...track,
+    favorite: isFavorite(store, track)
+  };
+}
+
+function hydrateTracks(tracks) {
+  return tracks.map(hydrateTrack);
+}
+
+function syncTrackFavoriteState(track, favorite) {
+  const targetKey = getTrackKey(track);
+  const apply = (item) => getTrackKey(item) === targetKey
+    ? { ...item, favorite }
+    : item;
+
+  results = results.map(apply);
+  queue = queue.map(apply);
+  history = history.map(apply);
+
+  if (currentTrack && getTrackKey(currentTrack) === targetKey) {
+    currentTrack = { ...currentTrack, favorite };
+  }
+}
+
+function toggleFavoriteForTrack(track) {
+  const favorite = toggleFavorite(store, track);
+  saveAppState();
+  syncTrackFavoriteState(track, favorite);
+  return favorite;
+}
+
+function setSequenceFromList(list, index) {
+  history = hydrateTracks(list.slice(0, index));
+  queue = hydrateTracks(list.slice(index + 1));
+}
+
+function cycleSource() {
+  source = source === 'youtube' ? 'soundcloud' : 'youtube';
+  persistConfig({ defaultSource: source });
+}
 
 function enableRawKeys() {
   if (process.stdin.isTTY && !process.stdin.isRaw) {
@@ -60,118 +167,31 @@ function isDown(key) { return key === '\x1b[B' || key === 'j'; }
 function isLeft(key) { return key === '\x1b[D' || key === 'h'; }
 function isRight(key) { return key === '\x1b[C' || key === 'l'; }
 
-process.stdin.on('data', async (key) => {
-  if (key === '\x03') { cleanup(); return; }
-
-  if (state === 'picker') {
-    // Tab or left/right arrows switch between vibes and activities
-    if (key === '\t' || isLeft(key) || isRight(key)) {
-      pickerTab = pickerTab === 'vibes' ? 'activities' : 'vibes';
-      renderPicker();
-      return;
-    }
-
-    const items = pickerTab === 'vibes' ? CHANNELS : ACTIVITIES;
-    const cursor = pickerTab === 'vibes' ? vibesCursor : activityCursor;
-
-    if (isUp(key)) {
-      const next = (cursor - 1 + items.length) % items.length;
-      if (pickerTab === 'vibes') vibesCursor = next;
-      else activityCursor = next;
-      renderPicker();
-      return;
-    }
-    if (isDown(key)) {
-      const next = (cursor + 1) % items.length;
-      if (pickerTab === 'vibes') vibesCursor = next;
-      else activityCursor = next;
-      renderPicker();
-      return;
-    }
-    if (key === '\r' || key === '\n') {
-      const item = items[cursor];
-      const query = pickerTab === 'vibes' ? item.query : pickActivityQuery(item);
-      await doSearch(query);
-      return;
-    }
-    // Number keys as shortcuts
-    const match = items.find(c => c.key === key);
-    if (match) {
-      const query = pickerTab === 'vibes' ? match.query : pickActivityQuery(match);
-      await doSearch(query);
-      return;
-    }
-    if (key === '/') { promptSearch(); return; }
-    if (key === 'q') { cleanup(); return; }
-  }
-
-  if (state === 'results') {
-    if (isUp(key)) {
-      resultsCursor = (resultsCursor - 1 + results.length) % results.length;
-      renderResultsList();
-      return;
-    }
-    if (isDown(key)) {
-      resultsCursor = (resultsCursor + 1) % results.length;
-      renderResultsList();
-      return;
-    }
-    if (key === '\r' || key === '\n') {
-      await playTrack(results[resultsCursor]);
-      return;
-    }
-    const num = parseInt(key);
-    if (num >= 1 && num <= results.length) {
-      await playTrack(results[num - 1]);
-      return;
-    }
-    if (key === '/' || key === 's') { promptSearch(); return; }
-    if (key === 'b') { showPicker(); return; }
-    if (key === 'q') { cleanup(); return; }
-  }
-
-  if (state === 'playing') {
-    if (key === ' ') {
-      await player.togglePause();
-      if (player.paused) ui.pauseVisualizer();
-      else ui.resumeVisualizer();
-    }
-    if (key === '/') {
-      ui.stopVisualizer();
-      await player.stop();
-      promptSearch();
-    }
-    if (key === 'b') {
-      ui.stopVisualizer();
-      await player.stop();
-      showPicker();
-    }
-    if (key === '[') await player.seekRelative(-10);
-    if (key === ']') await player.seekRelative(10);
-    if (key === 'v') ui.toggleVizMode();
-    if (key === 'o' && currentTrack) {
-      exec(`open "${currentTrack.url}"`);
-    }
-    if (key === '-') await player.setVolume(player.volume - 10);
-    if (key === '=' || key === '+') await player.setVolume(player.volume + 10);
-    if (key === 'q') cleanup();
-  }
-});
-
-// --- Render ---
-
 function renderPlaying() {
   let out = '\x1b[2J\x1b[H';
   const src = currentTrack?.source === 'soundcloud' ? 'soundcloud' : 'youtube';
   out += ui.header(src);
   out += '\n';
+
   if (currentTrack) {
-    out += ui.nowPlaying(currentTrack.title, currentTrack.channel, player.duration || currentTrack.duration, src);
+    out += ui.nowPlaying(
+      currentTrack.title,
+      currentTrack.channel,
+      player.duration || currentTrack.duration,
+      src,
+      {
+        favorite: currentTrack.favorite,
+        queueLength: queue.length,
+        historyLength: history.length
+      }
+    );
   }
+
   out += '\n\n';
-  const dur = player.duration || currentTrack?.duration;
+  const duration = player.duration || currentTrack?.duration;
+
   if (ui.vizMode === 'tape') {
-    out += ui.renderTape(player.position, dur);
+    out += ui.renderTape(player.position, duration);
   } else if (ui.vizMode === 'wave') {
     out += ui.renderWaveform();
   } else if (ui.vizMode === 'rain') {
@@ -181,10 +201,16 @@ function renderPlaying() {
   } else {
     out += ui.renderBars();
   }
+
   out += '\n\n';
-  out += ui.progressBar(player.position, dur);
+  out += ui.progressBar(player.position, duration);
   out += '\n\n';
-  out += ui.controls(player.paused);
+  out += ui.controls(player.paused, {
+    queueLength: queue.length,
+    canGoBack: history.length > 0,
+    isFavorite: currentTrack?.favorite
+  });
+
   process.stdout.write(out);
 }
 
@@ -193,16 +219,18 @@ function renderPicker() {
   process.stdout.write(ui.header(source));
   const cursor = pickerTab === 'vibes' ? vibesCursor : activityCursor;
   const items = pickerTab === 'vibes' ? CHANNELS : ACTIVITIES;
-  process.stdout.write(ui.picker(items, cursor, pickerTab));
+  process.stdout.write(ui.picker(items, cursor, pickerTab, {
+    source,
+    favoritesCount: store.favorites.length,
+    recentsCount: store.recents.length
+  }));
 }
 
 function renderResultsList() {
   ui.clear();
   process.stdout.write(ui.header(source));
-  process.stdout.write(ui.resultsList(results, resultsCursor));
+  process.stdout.write(ui.resultsList(results, resultsCursor, resultsMeta));
 }
-
-// --- Picker ---
 
 function showPicker() {
   state = 'picker';
@@ -213,9 +241,38 @@ function showPicker() {
   renderPicker();
 }
 
-// --- Search with loading animation ---
+function setResultsView(items, meta) {
+  results = hydrateTracks(items);
+  resultsMeta = meta;
+  state = 'results';
+  resultsCursor = 0;
+  ui.hideCursor();
+  enableRawKeys();
+  renderResultsList();
+}
+
+function showFavorites() {
+  setResultsView(store.favorites, {
+    title: 'favorites',
+    subtitle: `${store.favorites.length} saved track${store.favorites.length === 1 ? '' : 's'}`,
+    kind: 'favorites',
+    emptyMessage: 'no favorites yet. press f while browsing or playing to save one.',
+    footer: 'enter play · f unfavorite · / search · b back · m source · q quit'
+  });
+}
+
+function showRecents() {
+  setResultsView(store.recents, {
+    title: 'recently played',
+    subtitle: `${store.recents.length} recent track${store.recents.length === 1 ? '' : 's'}`,
+    kind: 'recents',
+    emptyMessage: 'no recents yet. play something and it will show up here.',
+    footer: 'enter play · f favorite · / search · b back · m source · q quit'
+  });
+}
 
 async function doSearch(query) {
+  currentQuery = query;
   state = 'searching';
   ui.hideCursor();
   enableRawKeys();
@@ -223,41 +280,37 @@ async function doSearch(query) {
   process.stdout.write(ui.header(source));
 
   const label = source === 'soundcloud' ? 'soundcloud' : 'youtube';
-
-  // Animated loading with tips
   const tips = [
-    'searching ' + label + '...',
+    `searching ${label}...`,
     'finding the best mixes...',
     'curating your vibe...',
-    'almost there...',
+    'almost there...'
   ];
+
   let frame = 0;
   let tipIdx = 0;
   const tipSwap = setInterval(() => {
     tipIdx = Math.min(tipIdx + 1, tips.length - 1);
   }, 3000);
+
   const spin = setInterval(() => {
     ui.moveTo(4, 1);
     process.stdout.write('\x1b[2K' + ui.spinner(frame++, tips[tipIdx]));
   }, 80);
 
   try {
-    results = await search(query, { source });
+    const searchLimit = store.config.searchLimit;
+    const foundResults = await search(query, { source, limit: searchLimit });
     clearInterval(spin);
     clearInterval(tipSwap);
 
-    if (results.length === 0) {
-      ui.clear();
-      process.stdout.write(ui.header(source));
-      process.stdout.write(`\n  \x1b[31mno results found\x1b[0m\n`);
-      promptSearch();
-      return;
-    }
-
-    state = 'results';
-    resultsCursor = 0;
-    renderResultsList();
-    enableRawKeys();
+    setResultsView(foundResults, {
+      title: 'search results',
+      subtitle: `${label} · ${query}`,
+      kind: 'search',
+      emptyMessage: `no ${label} results for “${query}”.`,
+      footer: 'enter play · f favorite · / search · b back · m source · q quit'
+    });
   } catch (err) {
     clearInterval(spin);
     clearInterval(tipSwap);
@@ -269,37 +322,37 @@ async function doSearch(query) {
 }
 
 async function playTrack(track) {
-  currentTrack = track;
+  const hydrated = hydrateTrack(track);
+  currentTrack = hydrated;
+  addRecent(store, hydrated);
+  saveAppState();
+
   state = 'playing';
   ui.hideCursor();
   enableRawKeys();
 
-  // Loading animation with stage tracking
   let frame = 0;
   let loadingStage = 'connecting';
   const loadingAnim = setInterval(() => {
     process.stdout.write('\x1b[2J\x1b[H');
-    process.stdout.write(ui.loadingScreen(frame++, track, source, loadingStage));
+    process.stdout.write(ui.loadingScreen(frame++, hydrated, source, loadingStage));
   }, 60);
 
   try {
-    // Stage 1: connect to mpv socket
-    await player.play(track.url);
+    await player.play(hydrated.url);
     loadingStage = 'buffering';
 
-    // Stage 2: wait for actual audio playback (position > 0 means audio is flowing)
-    await new Promise((resolve, reject) => {
+    await new Promise((resolve) => {
       let checks = 0;
       const poll = setInterval(() => {
         if (player.position > 0.5 || player.duration > 0) {
           clearInterval(poll);
           loadingStage = 'ready';
-          // Brief pause to show "ready" state before transitioning
           setTimeout(resolve, 400);
         }
-        if (++checks > 300) { // 30 second timeout
+        if (++checks > 300) {
           clearInterval(poll);
-          resolve(); // proceed anyway, might just be a slow stream
+          resolve();
         }
       }, 100);
     });
@@ -312,6 +365,44 @@ async function playTrack(track) {
     process.stdout.write(ui.header(source));
     process.stdout.write(`\n  \x1b[31mplayback error:\x1b[0m ${err.message}\n`);
     setTimeout(() => promptSearch(), 2000);
+  }
+}
+
+async function playSelectedResult(index) {
+  if (!results.length) return;
+  setSequenceFromList(results, index);
+  await playTrack(results[index]);
+}
+
+async function playNextTrack() {
+  if (!queue.length) return;
+  if (currentTrack) history.push(hydrateTrack(currentTrack));
+  const nextTrack = queue.shift();
+  await playTrack(nextTrack);
+}
+
+async function playPreviousTrack() {
+  if (!history.length) return;
+  if (currentTrack) queue.unshift(hydrateTrack(currentTrack));
+  const previousTrack = history.pop();
+  await playTrack(previousTrack);
+}
+
+async function rerunCurrentQueryWithNextSource() {
+  cycleSource();
+
+  if (resultsMeta.kind === 'search' && currentQuery) {
+    await doSearch(currentQuery);
+    return;
+  }
+
+  if (state === 'picker') {
+    renderPicker();
+    return;
+  }
+
+  if (state === 'results') {
+    renderResultsList();
   }
 }
 
@@ -331,38 +422,279 @@ function promptSearch() {
 
   rl.question('  \x1b[90mwhat do you want to hear?\x1b[0m\n  \x1b[97m\u25b8\x1b[0m ', (answer) => {
     rl.close();
-    const q = answer.trim();
-    if (!q) { promptSearch(); return; }
-    doSearch(q);
+    const query = answer.trim();
+    if (!query) {
+      promptSearch();
+      return;
+    }
+    void doSearch(query);
   });
 }
 
-// --- Player events ---
+process.stdin.on('data', async (key) => {
+  if (key === '\x03') {
+    cleanup(0);
+    return;
+  }
 
-player.on('ended', () => {
+  if (state === 'picker') {
+    if (key === '\t' || isLeft(key) || isRight(key)) {
+      pickerTab = pickerTab === 'vibes' ? 'activities' : 'vibes';
+      renderPicker();
+      return;
+    }
+
+    const items = pickerTab === 'vibes' ? CHANNELS : ACTIVITIES;
+    const cursor = pickerTab === 'vibes' ? vibesCursor : activityCursor;
+
+    if (isUp(key)) {
+      const next = (cursor - 1 + items.length) % items.length;
+      if (pickerTab === 'vibes') vibesCursor = next;
+      else activityCursor = next;
+      renderPicker();
+      return;
+    }
+
+    if (isDown(key)) {
+      const next = (cursor + 1) % items.length;
+      if (pickerTab === 'vibes') vibesCursor = next;
+      else activityCursor = next;
+      renderPicker();
+      return;
+    }
+
+    if (key === '\r' || key === '\n') {
+      const item = items[cursor];
+      const query = pickerTab === 'vibes' ? item.query : pickActivityQuery(item);
+      await doSearch(query);
+      return;
+    }
+
+    const match = items.find((item) => item.key === key);
+    if (match) {
+      const query = pickerTab === 'vibes' ? match.query : pickActivityQuery(match);
+      await doSearch(query);
+      return;
+    }
+
+    if (key === '/') {
+      promptSearch();
+      return;
+    }
+
+    if (key === 'f') {
+      showFavorites();
+      return;
+    }
+
+    if (key === 'r') {
+      showRecents();
+      return;
+    }
+
+    if (key === 'm') {
+      cycleSource();
+      renderPicker();
+      return;
+    }
+
+    if (key === 'q') {
+      cleanup(0);
+    }
+  }
+
+  if (state === 'results') {
+    if (!results.length) {
+      if (key === '/' || key === 's') {
+        promptSearch();
+        return;
+      }
+      if (key === 'b') {
+        showPicker();
+        return;
+      }
+      if (key === 'm') {
+        await rerunCurrentQueryWithNextSource();
+        return;
+      }
+      if (key === 'q') {
+        cleanup(0);
+      }
+      return;
+    }
+
+    if (isUp(key)) {
+      resultsCursor = (resultsCursor - 1 + results.length) % results.length;
+      renderResultsList();
+      return;
+    }
+
+    if (isDown(key)) {
+      resultsCursor = (resultsCursor + 1) % results.length;
+      renderResultsList();
+      return;
+    }
+
+    if (key === '\r' || key === '\n') {
+      await playSelectedResult(resultsCursor);
+      return;
+    }
+
+    const number = Number.parseInt(key, 10);
+    if (number >= 1 && number <= results.length) {
+      await playSelectedResult(number - 1);
+      return;
+    }
+
+    if (key === 'f') {
+      toggleFavoriteForTrack(results[resultsCursor]);
+      renderResultsList();
+      return;
+    }
+
+    if (key === '/' || key === 's') {
+      promptSearch();
+      return;
+    }
+
+    if (key === 'b') {
+      showPicker();
+      return;
+    }
+
+    if (key === 'm') {
+      await rerunCurrentQueryWithNextSource();
+      return;
+    }
+
+    if (key === 'q') {
+      cleanup(0);
+    }
+  }
+
   if (state === 'playing') {
-    ui.stopVisualizer();
-    showPicker();
+    if (key === ' ') {
+      await player.togglePause();
+      if (player.paused) ui.pauseVisualizer();
+      else ui.resumeVisualizer();
+      return;
+    }
+
+    if (key === '/') {
+      ui.stopVisualizer();
+      await player.stop();
+      promptSearch();
+      return;
+    }
+
+    if (key === 'b') {
+      ui.stopVisualizer();
+      await player.stop();
+      showPicker();
+      return;
+    }
+
+    if (key === '[') {
+      await player.seekRelative(-10);
+      return;
+    }
+
+    if (key === ']') {
+      await player.seekRelative(10);
+      return;
+    }
+
+    if (key === 'v') {
+      ui.toggleVizMode();
+      persistConfig({ vizMode: ui.vizMode });
+      renderPlaying();
+      return;
+    }
+
+    if (key === 'f' && currentTrack) {
+      toggleFavoriteForTrack(currentTrack);
+      renderPlaying();
+      return;
+    }
+
+    if (key === 'n') {
+      await playNextTrack();
+      return;
+    }
+
+    if (key === 'p') {
+      await playPreviousTrack();
+      return;
+    }
+
+    if (key === 'o' && currentTrack) {
+      try {
+        await openExternal(currentTrack.url);
+      } catch {
+        renderPlaying();
+      }
+      return;
+    }
+
+    if (key === '-') {
+      await player.setVolume(player.volume - 10);
+      persistConfig({ volume: player.volume });
+      renderPlaying();
+      return;
+    }
+
+    if (key === '=' || key === '+') {
+      await player.setVolume(player.volume + 10);
+      persistConfig({ volume: player.volume });
+      renderPlaying();
+      return;
+    }
+
+    if (key === 'q') {
+      cleanup(0);
+    }
   }
 });
 
-// --- Main ---
+player.on('ended', async () => {
+  if (state !== 'playing') return;
+  ui.stopVisualizer();
+
+  if (queue.length > 0) {
+    try {
+      await playNextTrack();
+      return;
+    } catch {
+      showPicker();
+      return;
+    }
+  }
+
+  showPicker();
+});
 
 async function main() {
+  if (!process.stdin.isTTY || !process.stdout.isTTY) {
+    console.error('sonic requires an interactive terminal. use `sonic doctor` for non-interactive diagnostics.');
+    process.exit(1);
+  }
+
+  const missingDependencies = getMissingDependencies();
+  if (missingDependencies.length > 0) {
+    console.error(formatDependencyHelp(missingDependencies));
+    process.exit(1);
+  }
+
   ui.hideCursor();
 
   if (queryArgs) {
     const channel = resolveChannel(queryArgs);
-    if (channel) {
-      enableRawKeys();
-      await doSearch(channel.query);
-    } else {
-      enableRawKeys();
-      await doSearch(queryArgs);
-    }
-  } else {
-    showPicker();
+    enableRawKeys();
+    await doSearch(channel ? channel.query : queryArgs);
+    return;
   }
+
+  showPicker();
 }
 
 main().catch((err) => {
