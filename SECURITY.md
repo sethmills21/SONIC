@@ -2,7 +2,7 @@
 
 ## Status
 
-Sonic is currently a small hobby project and should be treated as best-effort software until there is CI, release automation, and a clearer support policy.
+Sonic is a small hobby project with a basic CI check and manual smoke testing. Treat it as best-effort software: there is no formal support SLA, no release-signing workflow, and no promise of long-term compatibility across platforms.
 
 ## Reporting A Vulnerability
 
@@ -33,6 +33,7 @@ Include:
 - browser opening is limited to `http` and `https` URLs
 - search execution uses argument-based process spawning, not shell interpolation
 - dependencies are intentionally small and tracked via `package-lock.json`
+- setup diagnostics are available via `node ./bin/sonic.js doctor`
 
 ## Security Rules For Contributors
 

@@ -2,7 +2,9 @@
   "name": "sonic-cli",
   "version": "0.1.0",
   "description": "A YouTube-first terminal music player powered by mpv and yt-dlp",
+  "license": "MIT",
   "type": "module",
+  "author": "Seth Mills",
   "bin": {
     "sonic": "./bin/sonic.js"
   },
@@ -24,6 +26,14 @@
   "engines": {
     "node": ">=20"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sethmills21/sonic.git"
+  },
+  "bugs": {
+    "url": "https://github.com/sethmills21/sonic/issues"
+  },
+  "homepage": "https://github.com/sethmills21/sonic#readme",
   "keywords": [
     "cli",
     "music",

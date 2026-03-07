@@ -51,6 +51,11 @@ Manual smoke-test checklist:
 - Do not interpolate untrusted values into shell commands
 - Preserve the current low-friction startup story
 - If you add a service integration, document auth, legal, and setup implications in `README.md`
+- Keep `README.md`, `CLAUDE.md`, and `AGENTS.md` aligned with the real behavior
+
+## License
+
+By contributing, you agree that your work will be released under the MIT license in this repository.
 
 ## UX Guidelines
 
