@@ -1,12 +1,12 @@
-# Sonic
+# SONIC
 
 <p align="center">
   <img src="./assets/demo.gif" alt="Sonic — terminal music player" width="800">
 </p>
 
 <p align="center">
-  A terminal music player with a theatrical TUI, fast keyboard controls, and persistent local state.<br>
-  Search YouTube, SoundCloud, and Mixcloud from your terminal. Zero browser tabs. One dependency.
+  A fast, theatrical terminal music player.<br>
+  Search YouTube, SoundCloud, and Mixcloud. Zero browser tabs.
 </p>
 
 <p align="center">
@@ -15,32 +15,49 @@
   <img src="https://img.shields.io/badge/sources-3-purple?style=flat-square" alt="Sources">
 </p>
 
-## Install
+## Quick Start
+
+**One-liner** (macOS / Linux — installs prereqs automatically):
 
 ```bash
-brew install yt-dlp mpv                              # prereqs (macOS)
-git clone https://github.com/sethmills21/sonic.git && cd sonic && npm install
-npm start                                             # open the picker
+curl -fsSL https://raw.githubusercontent.com/sethmills21/sonic/main/install.sh | bash
 ```
 
 <details>
-<summary>Linux</summary>
+<summary><strong>npm</strong></summary>
 
 ```bash
-sudo apt install yt-dlp mpv
-git clone https://github.com/sethmills21/sonic.git && cd sonic && npm install
+npm install -g sonic-cli
+sonic "lofi"
 ```
 </details>
 
-Run `npm run doctor` to verify your setup.
+<details>
+<summary><strong>Hackable</strong></summary>
+
+```bash
+brew install yt-dlp mpv                    # macOS prereqs
+git clone https://github.com/sethmills21/sonic.git
+cd sonic && npm install
+npm start
+```
+</details>
+
+<details>
+<summary><strong>Verify setup</strong></summary>
+
+```bash
+sonic doctor
+```
+</details>
 
 ## Usage
 
 ```bash
-npm start                        # open the picker
-npm start -- "lofi"              # search and play immediately
-npm start -- --soundcloud "dnb"  # search SoundCloud
-npm start -- --mixcloud "techno" # search Mixcloud
+sonic                            # open the picker
+sonic "deep house"               # search YouTube
+sonic --soundcloud "liquid dnb"  # search SoundCloud
+sonic --mixcloud "techno mix"    # search Mixcloud
 ```
 
 ## Controls
@@ -81,7 +98,7 @@ YouTube, SoundCloud, and Mixcloud. All use `mpv` for playback and require no aut
 
 ## Requirements
 
-- **Node.js** 20+ &nbsp; **yt-dlp** &nbsp; **mpv** &nbsp; macOS or Linux
+**Node.js** 20+ &nbsp;&middot;&nbsp; **yt-dlp** &nbsp;&middot;&nbsp; **mpv** &nbsp;&middot;&nbsp; macOS or Linux
 
 ## Contributing
 
