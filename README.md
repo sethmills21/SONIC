@@ -1,5 +1,9 @@
 # Sonic
 
+<p align="center">
+  <img src="./assets/demo.gif" alt="Sonic — terminal music player" width="800">
+</p>
+
 A terminal music player with a theatrical TUI, fast keyboard controls, and persistent local state. Search YouTube, SoundCloud, and Mixcloud from the terminal and start playing with zero browser-tab overhead.
 
 Uses `yt-dlp` for search and URL resolution, `mpv` for audio playback, and plain Node.js for the CLI runtime. One dependency (`chalk`). No frameworks.
