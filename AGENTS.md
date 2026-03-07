@@ -85,10 +85,6 @@ What to steal for Sonic:
 4. cleaner service adapter boundaries
 5. broader platform support and release automation
 
-## Session Notes
-
-If `sesh` comes up, check whether the local sibling repo `/Users/MillsMac/code/seth.space` is the target. Favor a thin CLI integration over direct database coupling.
-
 ## Validation
 
 For meaningful changes:

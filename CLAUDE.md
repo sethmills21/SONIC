@@ -94,16 +94,6 @@ If a user asks to expand beyond YouTube:
 - Do not present unofficial playback paths as if they were official SDK integrations
 - Keep adapters isolated so the core TUI is not tied to one service's auth model
 
-## Session Integration
-
-If the user mentions `sesh`, there is likely a sibling local project at `/Users/MillsMac/code/seth.space` with a `sesh` CLI (`npm run sesh` / `scripts/session.ts`). Prefer integrating with that CLI boundary instead of reaching into another repo's internals.
-
-Good first integration ideas:
-
-- pick a default soundtrack from the active session type
-- log the selected vibe/query against a session
-- resume the last session soundtrack
-
 ## Release Readiness
 
 Before calling this project ready for public GitHub/npm release, make sure the repo has:

@@ -53,7 +53,10 @@ else
   if [[ "$OS" == "macos" ]]; then
     brew install yt-dlp || fail "Failed to install yt-dlp via Homebrew"
   else
-    sudo apt-get install -y yt-dlp 2>/dev/null || pip install yt-dlp || fail "Failed to install yt-dlp"
+    SUDO=""; command -v sudo &>/dev/null && SUDO="sudo"
+    $SUDO apt-get install -y yt-dlp 2>/dev/null \
+      || { curl -fsSL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp && chmod +x /usr/local/bin/yt-dlp; } \
+      || fail "Failed to install yt-dlp"
   fi
   ok "yt-dlp installed"
 fi
@@ -67,7 +70,8 @@ else
   if [[ "$OS" == "macos" ]]; then
     brew install mpv || fail "Failed to install mpv via Homebrew"
   else
-    sudo apt-get install -y mpv || fail "Failed to install mpv"
+    SUDO=""; command -v sudo &>/dev/null && SUDO="sudo"
+    $SUDO apt-get update -qq && $SUDO apt-get install -y mpv || fail "Failed to install mpv"
   fi
   ok "mpv installed"
 fi
