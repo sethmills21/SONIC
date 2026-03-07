@@ -5,8 +5,8 @@
 </p>
 
 <p align="center">
-  A fast, theatrical terminal music player.<br>
-  Search YouTube, SoundCloud, and Mixcloud. Zero browser tabs.
+  Nothing crazy but SONIC is a vibes-based CLI music player to join alongside your other terminal tabs<br>
+  Supports YouTube, Mixcloud, and Soundcloud as of now.
 </p>
 
 <p align="center">
