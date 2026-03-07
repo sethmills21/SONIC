@@ -1,115 +1,117 @@
 # Sonic
 
 <p align="center">
+  <a href="https://github.com/sethmills21/sonic/releases/latest"><img src="https://img.shields.io/github/v/release/sethmills21/sonic?style=for-the-badge&color=blue" alt="Release"></a>
+  <a href="https://github.com/sethmills21/sonic/stargazers"><img src="https://img.shields.io/github/stars/sethmills21/sonic?style=for-the-badge" alt="Stars"></a>
+  <img src="https://img.shields.io/badge/node-%3E%3D20-green?style=for-the-badge&logo=node.js" alt="Node">
+  <img src="https://img.shields.io/badge/license-MIT-yellow?style=for-the-badge" alt="License">
+  <img src="https://img.shields.io/badge/sources-3-purple?style=for-the-badge" alt="Sources">
+</p>
+
+<p align="center">
   <img src="./assets/demo.gif" alt="Sonic — terminal music player" width="800">
 </p>
 
-A terminal music player with a theatrical TUI, fast keyboard controls, and persistent local state. Search YouTube, SoundCloud, and Mixcloud from the terminal and start playing with zero browser-tab overhead.
+A terminal music player with a theatrical TUI, fast keyboard controls, and persistent local state.
+Search YouTube, SoundCloud, and Mixcloud from your terminal. Zero browser tabs. One dependency.
 
-Uses `yt-dlp` for search and URL resolution, `mpv` for audio playback, and plain Node.js for the CLI runtime. One dependency (`chalk`). No frameworks.
+## Table of Contents
 
-## What It Does
+- [Quick Start](#quick-start)
+- [Commands](#commands)
+- [Controls](#controls)
+- [Sources](#sources)
+- [Themes](#themes)
+- [Visualizers](#visualizers)
+- [Local State](#local-state)
+- [Project Layout](#project-layout)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [License](#license)
 
-- Search YouTube, SoundCloud, and Mixcloud from the terminal
-- Play long-form mixes, playlists, and ambient sessions via `mpv`
-- Browse curated vibe and activity pickers
-- Save favorites and revisit recents across all sources
-- Carry a next-track queue through search results
-- Switch between 6 themes with dark and light mode support
-- Swap between 5 visualizer modes during playback (bars, tape, wave, rain, flame)
-- macOS media key support (play/pause/next via Control Center)
-- Open the current track in a browser when needed
-- Run `sonic doctor` to verify setup
+## Quick Start
 
-## Requirements
-
-- Node.js 20+
-- `yt-dlp`
-- `mpv`
-- A real TTY terminal
-- macOS or Linux (Windows not yet supported)
-
-## Install
-
-### macOS
+### Install
 
 ```bash
+# macOS
 brew install yt-dlp mpv
 git clone https://github.com/sethmills21/sonic.git
-cd sonic
-npm install
-npm start
-```
+cd sonic && npm install
 
-### Linux
-
-Install `yt-dlp` and `mpv` with your package manager, then:
-
-```bash
+# Linux (Debian/Ubuntu)
+sudo apt install yt-dlp mpv
 git clone https://github.com/sethmills21/sonic.git
-cd sonic
-npm install
-npm start
+cd sonic && npm install
 ```
 
-### Verify your setup
+### Verify
 
 ```bash
 npm run doctor
 ```
 
-## Usage
+### First command
 
 ```bash
-npm start
-npm start -- "lofi"
-node ./bin/sonic.js "deep house"
-node ./bin/sonic.js --soundcloud "liquid dnb"
-node ./bin/sonic.js --mixcloud "techno mix"
-node ./bin/sonic.js doctor
-node ./bin/sonic.js --help
+npm start                        # open the picker
+npm start -- "lofi"              # search and play immediately
 ```
 
-Planned publish UX once the package is released:
+Once published to npm:
 
 ```bash
 npx sonic-cli "lofi"
 # or
-npm install -g sonic-cli
-sonic "lofi"
+npm install -g sonic-cli && sonic "lofi"
+```
+
+## Commands
+
+```bash
+sonic                            # open the picker
+sonic "deep house"               # search YouTube
+sonic --soundcloud "liquid dnb"  # search SoundCloud
+sonic --mixcloud "techno mix"    # search Mixcloud
+sonic doctor                     # check setup
+sonic --help                     # full help
 ```
 
 ## Controls
 
 ### Picker
 
-- `Arrow keys` / `j` `k`: move through lists
-- `Tab` / `Left` / `Right`: switch picker tabs
-- `Enter`: play selected
-- `/`: search
-- `f`: open favorites
-- `r`: open recents
-- `m`: cycle source (YouTube / SoundCloud / Mixcloud)
-- `t` / `T`: next / previous theme
-- `d`: toggle dark / light mode
-- `q`: quit
+| Key | Action |
+| --- | --- |
+| `Arrow keys` / `j` `k` | Move through lists |
+| `Tab` / `Left` / `Right` | Switch picker tabs |
+| `Enter` | Play selected |
+| `/` | Search |
+| `f` | Open favorites |
+| `r` | Open recents |
+| `m` | Cycle source (YouTube / SoundCloud / Mixcloud) |
+| `t` / `T` | Next / previous theme |
+| `d` | Toggle dark / light mode |
+| `q` | Quit |
 
 ### Playback
 
-- `Space`: pause / resume
-- `n` / `p`: next / previous track in queue
-- `f`: favorite / unfavorite current track
-- `[` / `]`: seek backward / forward 10 seconds
-- `-` / `+`: volume down / up
-- `v`: cycle visualizer mode
-- `t` / `T`: next / previous theme
-- `d`: toggle dark / light mode
-- `o`: open current track in browser
-- `/`: search (stops playback)
-- `b`: back to picker
-- `q`: quit
+| Key | Action |
+| --- | --- |
+| `Space` | Pause / resume |
+| `n` / `p` | Next / previous track in queue |
+| `f` | Favorite / unfavorite current track |
+| `[` / `]` | Seek backward / forward 10 seconds |
+| `-` / `+` | Volume down / up |
+| `v` | Cycle visualizer mode |
+| `t` / `T` | Next / previous theme |
+| `d` | Toggle dark / light mode |
+| `o` | Open current track in browser |
+| `/` | Search (stops playback) |
+| `b` | Back to picker |
+| `q` | Quit |
 
-macOS media keys (play/pause, next) work via Control Center when `mpv` is running.
+macOS media keys (play/pause, next) work via Control Center.
 
 ## Sources
 
@@ -123,24 +125,30 @@ Press `m` to cycle between sources. Use `--soundcloud` or `--mixcloud` flags to 
 
 ## Themes
 
-Sonic ships with 6 built-in themes, each with dark and light mode variants:
+Six built-in themes, each with dark and light mode variants:
 
-- **Neon Night** — the original rainbow night-session glow
-- **Sunset Cassette** — warm retro tape-deck energy
-- **Ice Glass** — cold chrome and plasma blues
-- **Ember Void** — molten orange, red, and magenta
-- **Midnight Tokyo** — cyberpunk neon through rain-soaked glass
-- **Terminal Green** — phosphor glow on a CRT at 2am
+| Theme | Vibe |
+| --- | --- |
+| **Neon Night** | Rainbow night-session glow |
+| **Sunset Cassette** | Warm retro tape-deck energy |
+| **Ice Glass** | Cold chrome and plasma blues |
+| **Ember Void** | Molten orange, red, and magenta |
+| **Midnight Tokyo** | Cyberpunk neon through rain-soaked glass |
+| **Terminal Green** | Phosphor glow on a CRT at 2am |
 
 Press `t` / `T` to cycle themes, `d` to toggle dark/light mode. Both persist across runs.
 
 ## Visualizers
 
-- **Bars** — spectrum analyzer with mirror reflection
-- **Tape** — cassette deck with spinning reels and progress
-- **Wave** — oscilloscope waveform
-- **Rain** — matrix-style falling characters
-- **Flame** — fire simulation driven by audio energy
+Five modes, all driven by simulated audio energy:
+
+| Mode | Style |
+| --- | --- |
+| **Bars** | Spectrum analyzer with mirror reflection |
+| **Tape** | Cassette deck with spinning reels and progress |
+| **Wave** | Oscilloscope waveform |
+| **Rain** | Matrix-style falling characters |
+| **Flame** | Fire simulation |
 
 Press `v` during playback to cycle through modes.
 
@@ -170,28 +178,44 @@ lib/themes.js     theme registry, palettes, and color mode detection
 
 ### Near term
 
-- Richer in-app config editing instead of manual JSON edits
-- Playlist save and load flows on top of favorites and recents
-- CI beyond syntax checks with real smoke coverage
-- Queue UX with reordering and explicit queue views
+- Richer in-app config editing
+- Playlist save and load flows
+- CI with real smoke coverage
+- Queue UX with reordering
 
 ### Medium term
 
 - Saved stations and richer search filters
-- Album-art-aware terminal layouts where they improve the experience
-- Linux polish and explicit Windows support decision
-- Release automation for GitHub and npm
-- Session-aware workflows (detect active work session, pick soundtrack, log what played)
+- Album-art-aware terminal layouts
+- Linux polish and Windows support decision
+- npm publish and release automation
+- Session-aware workflows
 
-## Security Notes
+## Requirements
+
+- **Node.js** 20+
+- **yt-dlp** — search and URL resolution
+- **mpv** — audio playback
+- A real TTY terminal (macOS or Linux)
+
+## Security
 
 - Sonic shells out to `yt-dlp` and `mpv`. All shell execution is treated as security-sensitive.
 - Browser opening is limited to `http` and `https` URLs.
 - Mixcloud search uses their public API over HTTPS. No credentials stored.
-- Keep dependencies minimal. This project does not need a heavy framework stack.
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) and [SECURITY.md](./SECURITY.md).
+See [SECURITY.md](./SECURITY.md) for reporting.
+
+## Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## License
 
 MIT. See [LICENSE](./LICENSE).
+
+---
+
+<p align="center">
+  Made by <a href="https://github.com/sethmills21">Seth Mills</a>
+</p>
