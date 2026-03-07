@@ -1,19 +1,19 @@
 # Sonic
 
 <p align="center">
-  <a href="https://github.com/sethmills21/sonic/releases/latest"><img src="https://img.shields.io/github/v/release/sethmills21/sonic?style=for-the-badge&color=blue" alt="Release"></a>
-  <a href="https://github.com/sethmills21/sonic/stargazers"><img src="https://img.shields.io/github/stars/sethmills21/sonic?style=for-the-badge" alt="Stars"></a>
-  <img src="https://img.shields.io/badge/node-%3E%3D20-green?style=for-the-badge&logo=node.js" alt="Node">
-  <img src="https://img.shields.io/badge/license-MIT-yellow?style=for-the-badge" alt="License">
-  <img src="https://img.shields.io/badge/sources-3-purple?style=for-the-badge" alt="Sources">
-</p>
-
-<p align="center">
   <img src="./assets/demo.gif" alt="Sonic — terminal music player" width="800">
 </p>
 
-A terminal music player with a theatrical TUI, fast keyboard controls, and persistent local state.
-Search YouTube, SoundCloud, and Mixcloud from your terminal. Zero browser tabs. One dependency.
+<p align="center">
+  A terminal music player with a theatrical TUI, fast keyboard controls, and persistent local state.<br>
+  Search YouTube, SoundCloud, and Mixcloud from your terminal. Zero browser tabs. One dependency.
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/node-%3E%3D20-green?style=flat-square&logo=node.js" alt="Node">
+  <img src="https://img.shields.io/badge/license-MIT-yellow?style=flat-square" alt="License">
+  <img src="https://img.shields.io/badge/sources-3-purple?style=flat-square" alt="Sources">
+</p>
 
 ## Table of Contents
 
