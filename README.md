@@ -51,13 +51,15 @@ sonic doctor
 ```
 </details>
 
-## Usage
+## Commands
 
 ```bash
 sonic                            # open the picker
-sonic "deep house"               # search YouTube
+sonic "deep house"               # search and play
 sonic --soundcloud "liquid dnb"  # search SoundCloud
 sonic --mixcloud "techno mix"    # search Mixcloud
+sonic doctor                     # check setup
+sonic --help                     # full help
 ```
 
 ## Controls
@@ -111,5 +113,9 @@ MIT
 ---
 
 <p align="center">
-  Made by <a href="https://github.com/sethmills21">Seth Mills</a>
+  Cooked up by <a href="https://github.com/sethmills21">Seth Miller</a> and <a href="https://claude.ai/code">Claude Code</a>
+</p>
+
+<p align="center">
+  <sub>Not claiming this is some groundbreaking piece of tech — just solving my own problem and had a lot of fun building it. Open to ideas, feel free to fork.</sub>
 </p>
