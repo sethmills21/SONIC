@@ -1,7 +1,7 @@
 {
   "name": "sonic-cli",
   "version": "0.1.0",
-  "description": "A YouTube-first terminal music player powered by mpv and yt-dlp",
+  "description": "A terminal music player with YouTube, SoundCloud, and Mixcloud — powered by mpv and yt-dlp",
   "license": "MIT",
   "type": "module",
   "author": "Seth Mills",
@@ -39,9 +39,13 @@
     "music",
     "player",
     "terminal",
+    "tui",
     "youtube",
+    "soundcloud",
+    "mixcloud",
     "mpv",
-    "yt-dlp"
+    "yt-dlp",
+    "visualizer"
   ],
   "dependencies": {
     "chalk": "^5.4.1"

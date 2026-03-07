@@ -2,8 +2,9 @@
 
 import readline from 'node:readline';
 import { readFileSync } from 'node:fs';
+import chalk from 'chalk';
 
-import { search } from '../lib/search.js';
+import { search, SOURCES } from '../lib/search.js';
 import { Player } from '../lib/player.js';
 import { UI } from '../lib/ui.js';
 import {
@@ -72,10 +73,14 @@ let resultsMeta = {
 
 ui.vizMode = store.config.vizMode;
 ui.setTheme(store.config.theme);
+ui.colorMode = store.config.colorMode;
 player.volume = store.config.volume;
 
 if (args.includes('--sc') || args.includes('--soundcloud')) {
   source = 'soundcloud';
+}
+if (args.includes('--mc') || args.includes('--mixcloud')) {
+  source = 'mixcloud';
 }
 
 let pickerTab = 'vibes';
@@ -91,11 +96,21 @@ const queryArgs = args
 
 function cleanup(exitCode = 0) {
   ui.cleanup();
+  // Kill mpv synchronously to prevent orphaned audio
+  if (player.proc) {
+    try { player.proc.kill('SIGKILL'); } catch {}
+  }
   player.stop().then(() => process.exit(exitCode)).catch(() => process.exit(exitCode));
 }
 
 process.on('SIGINT', () => cleanup(0));
 process.on('SIGTERM', () => cleanup(0));
+process.on('exit', () => {
+  // Last-resort: if mpv is still around, force kill
+  if (player.proc) {
+    try { player.proc.kill('SIGKILL'); } catch {}
+  }
+});
 
 function saveAppState() {
   saveStore(store);
@@ -145,8 +160,15 @@ function setSequenceFromList(list, index) {
 }
 
 function cycleSource() {
-  source = source === 'youtube' ? 'soundcloud' : 'youtube';
+  const idx = SOURCES.indexOf(source);
+  source = SOURCES[(idx + 1) % SOURCES.length];
   persistConfig({ defaultSource: source });
+}
+
+function toggleColorMode() {
+  const current = ui.effectiveColorMode;
+  ui.colorMode = current === 'dark' ? 'light' : 'dark';
+  persistConfig({ colorMode: ui.colorMode });
 }
 
 function cycleThemeInApp(direction = 1) {
@@ -193,8 +215,8 @@ function isLeft(key) { return key === '\x1b[D' || key === 'h'; }
 function isRight(key) { return key === '\x1b[C' || key === 'l'; }
 
 function renderPlaying() {
-  let out = '\x1b[2J\x1b[H';
-  const src = currentTrack?.source === 'soundcloud' ? 'soundcloud' : 'youtube';
+  const src = currentTrack?.source || 'youtube';
+  let out = '';
   out += ui.header(src);
   out += '\n';
 
@@ -236,7 +258,8 @@ function renderPlaying() {
     isFavorite: currentTrack?.favorite
   });
 
-  process.stdout.write(out);
+  // Flicker-free render: cursor home, clear each line's trailing chars, clear below
+  process.stdout.write('\x1b[H' + out.replace(/\n/g, '\x1b[K\n') + '\x1b[J');
 }
 
 function renderPicker() {
@@ -282,7 +305,7 @@ function showFavorites() {
     subtitle: `${store.favorites.length} saved track${store.favorites.length === 1 ? '' : 's'}`,
     kind: 'favorites',
     emptyMessage: 'no favorites yet. press f while browsing or playing to save one.',
-    footer: 'enter play · f unfavorite · / search · b back · m source · t theme · q quit'
+    footer: 'enter play · f unfavorite · / search · b back · m source · t theme · d mode · q quit'
   });
 }
 
@@ -292,7 +315,7 @@ function showRecents() {
     subtitle: `${store.recents.length} recent track${store.recents.length === 1 ? '' : 's'}`,
     kind: 'recents',
     emptyMessage: 'no recents yet. play something and it will show up here.',
-    footer: 'enter play · f favorite · / search · b back · m source · t theme · q quit'
+    footer: 'enter play · f favorite · / search · b back · m source · t theme · d mode · q quit'
   });
 }
 
@@ -304,9 +327,8 @@ async function doSearch(query) {
   ui.clear();
   process.stdout.write(ui.header(source));
 
-  const label = source === 'soundcloud' ? 'soundcloud' : 'youtube';
   const tips = [
-    `searching ${label}...`,
+    `searching ${source}...`,
     'finding the best mixes...',
     'curating your vibe...',
     'almost there...'
@@ -331,17 +353,17 @@ async function doSearch(query) {
 
     setResultsView(foundResults, {
       title: 'search results',
-      subtitle: `${label} · ${query}`,
+      subtitle: `${source} · ${query}`,
       kind: 'search',
-      emptyMessage: `no ${label} results for “${query}”.`,
-      footer: 'enter play · f favorite · / search · b back · m source · t theme · q quit'
+      emptyMessage: `no ${source} results for “${query}”.`,
+      footer: 'enter play · f favorite · / search · b back · m source · t theme · d mode · q quit'
     });
   } catch (err) {
     clearInterval(spin);
     clearInterval(tipSwap);
     ui.clear();
     process.stdout.write(ui.header(source));
-    process.stdout.write(`\n  \x1b[31msearch failed:\x1b[0m ${err.message}\n`);
+    process.stdout.write(`\n  ${chalk.red('search failed:')} ${err.message}\n`);
     promptSearch();
   }
 }
@@ -359,8 +381,8 @@ async function playTrack(track) {
   let frame = 0;
   let loadingStage = 'connecting';
   const loadingAnim = setInterval(() => {
-    process.stdout.write('\x1b[2J\x1b[H');
-    process.stdout.write(ui.loadingScreen(frame++, hydrated, source, loadingStage));
+    const content = ui.loadingScreen(frame++, hydrated, source, loadingStage);
+    process.stdout.write('\x1b[H' + content.replace(/\n/g, '\x1b[K\n') + '\x1b[J');
   }, 60);
 
   try {
@@ -388,7 +410,7 @@ async function playTrack(track) {
     clearInterval(loadingAnim);
     ui.clear();
     process.stdout.write(ui.header(source));
-    process.stdout.write(`\n  \x1b[31mplayback error:\x1b[0m ${err.message}\n`);
+    process.stdout.write(`\n  ${chalk.red('playback error:')} ${err.message}\n`);
     setTimeout(() => promptSearch(), 2000);
   }
 }
@@ -528,6 +550,12 @@ process.stdin.on('data', async (key) => {
       return;
     }
 
+    if (key === 'd') {
+      toggleColorMode();
+      renderPicker();
+      return;
+    }
+
     if (key === 'q') {
       cleanup(0);
     }
@@ -549,6 +577,11 @@ process.stdin.on('data', async (key) => {
       }
       if (key === 't' || key === 'T') {
         cycleThemeInApp(key === 'T' ? -1 : 1);
+        return;
+      }
+      if (key === 'd') {
+        toggleColorMode();
+        renderResultsList();
         return;
       }
       if (key === 'q') {
@@ -606,6 +639,12 @@ process.stdin.on('data', async (key) => {
       return;
     }
 
+    if (key === 'd') {
+      toggleColorMode();
+      renderResultsList();
+      return;
+    }
+
     if (key === 'q') {
       cleanup(0);
     }
@@ -614,8 +653,6 @@ process.stdin.on('data', async (key) => {
   if (state === 'playing') {
     if (key === ' ') {
       await player.togglePause();
-      if (player.paused) ui.pauseVisualizer();
-      else ui.resumeVisualizer();
       return;
     }
 
@@ -652,6 +689,12 @@ process.stdin.on('data', async (key) => {
 
     if (key === 't' || key === 'T') {
       cycleThemeInApp(key === 'T' ? -1 : 1);
+      return;
+    }
+
+    if (key === 'd') {
+      toggleColorMode();
+      renderPlaying();
       return;
     }
 
@@ -698,6 +741,12 @@ process.stdin.on('data', async (key) => {
       cleanup(0);
     }
   }
+});
+
+player.on('pause', (paused) => {
+  if (state !== 'playing') return;
+  if (paused) ui.pauseVisualizer();
+  else ui.resumeVisualizer();
 });
 
 player.on('ended', async () => {
