@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  Nothing crazy but SONIC is a vibes-based CLI music player to join alongside your other terminal tabs<br>
+  SONIC is a vibes-based CLI music player to join alongside your other terminal tabs<br>
   Supports YouTube, Mixcloud, and Soundcloud as of now.
 </p>
 
