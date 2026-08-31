@@ -4,7 +4,7 @@ import readline from 'node:readline';
 import { readFileSync } from 'node:fs';
 import chalk from 'chalk';
 
-import { search, SOURCES } from '../lib/search.js';
+import { search, SOURCES, parseSourceUrl, resolveUrl } from '../lib/search.js';
 import { Player } from '../lib/player.js';
 import { UI } from '../lib/ui.js';
 import {
@@ -82,6 +82,8 @@ if (args.includes('--sc') || args.includes('--soundcloud')) {
 if (args.includes('--mc') || args.includes('--mixcloud')) {
   source = 'mixcloud';
 }
+
+const LINK_TRACK_LIMIT = 100;
 
 let pickerTab = 'vibes';
 let vibesCursor = 0;
@@ -319,20 +321,13 @@ function showRecents() {
   });
 }
 
-async function doSearch(query) {
-  currentQuery = query;
-  state = 'searching';
+// Runs an async task behind the animated loader. Never throws: the caller
+// decides how to present success and failure.
+async function runWithLoader(tips, task) {
   ui.hideCursor();
   enableRawKeys();
   ui.clear();
   process.stdout.write(ui.header(source));
-
-  const tips = [
-    `searching ${source}...`,
-    'finding the best mixes...',
-    'curating your vibe...',
-    'almost there...'
-  ];
 
   let frame = 0;
   let tipIdx = 0;
@@ -346,26 +341,85 @@ async function doSearch(query) {
   }, 80);
 
   try {
-    const searchLimit = store.config.searchLimit;
-    const foundResults = await search(query, { source, limit: searchLimit });
-    clearInterval(spin);
-    clearInterval(tipSwap);
-
-    setResultsView(foundResults, {
-      title: 'search results',
-      subtitle: `${source} · ${query}`,
-      kind: 'search',
-      emptyMessage: `no ${source} results for “${query}”.`,
-      footer: 'enter play · f favorite · / search · b back · m source · t theme · d mode · q quit'
-    });
+    const value = await task();
+    return { ok: true, value };
   } catch (err) {
+    return { ok: false, error: err };
+  } finally {
     clearInterval(spin);
     clearInterval(tipSwap);
-    ui.clear();
-    process.stdout.write(ui.header(source));
-    process.stdout.write(`\n  ${chalk.red('search failed:')} ${err.message}\n`);
-    promptSearch();
   }
+}
+
+function showLoadFailure(label, err) {
+  ui.clear();
+  process.stdout.write(ui.header(source));
+  process.stdout.write(`\n  ${chalk.red(label)} ${err.message}\n`);
+  promptSearch();
+}
+
+async function doSearch(query) {
+  const link = parseSourceUrl(query);
+  if (link) {
+    await doOpenLink(query, link);
+    return;
+  }
+
+  currentQuery = query;
+  state = 'searching';
+
+  const outcome = await runWithLoader([
+    `searching ${source}...`,
+    'finding the best mixes...',
+    'curating your vibe...',
+    'almost there...'
+  ], () => search(query, { source, limit: store.config.searchLimit }));
+
+  if (!outcome.ok) {
+    showLoadFailure('search failed:', outcome.error);
+    return;
+  }
+
+  setResultsView(outcome.value, {
+    title: 'search results',
+    subtitle: `${source} · ${query}`,
+    kind: 'search',
+    emptyMessage: `no ${source} results for “${query}”.`,
+    footer: 'enter play · f favorite · / search · b back · m source · t theme · d mode · q quit'
+  });
+}
+
+async function doOpenLink(rawUrl, link) {
+  currentQuery = null;
+  state = 'searching';
+  source = link.source;
+
+  const outcome = await runWithLoader([
+    `opening ${link.source} link...`,
+    'resolving track info...',
+    'almost there...'
+  ], () => resolveUrl(rawUrl, { limit: LINK_TRACK_LIMIT }));
+
+  if (!outcome.ok) {
+    showLoadFailure('link failed:', outcome.error);
+    return;
+  }
+
+  const { tracks, kind, note } = outcome.value;
+  const heading = kind === 'playlist' ? 'playlist' : 'linked track';
+
+  let subtitle = `${link.source} · ${tracks.length} track${tracks.length === 1 ? '' : 's'}`;
+  if (note) {
+    subtitle = `${subtitle} · ${note}`;
+  }
+
+  setResultsView(tracks, {
+    title: heading,
+    subtitle,
+    kind: 'link',
+    emptyMessage: 'that link resolved to no playable tracks.',
+    footer: 'enter play · f favorite · / search · b back · m source · t theme · d mode · q quit'
+  });
 }
 
 async function playTrack(track) {
