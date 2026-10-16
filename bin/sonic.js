@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-import readline from 'node:readline';
 import { readFileSync } from 'node:fs';
 import { spawn, spawnSync } from 'node:child_process';
 
@@ -76,7 +75,7 @@ let results = [];
 let currentTrack = null;
 let currentQuery = '';
 let currentSearchOptions = {};
-let state = 'idle'; // idle | picker | searching | results | playing | search_input
+let state = 'idle'; // idle | picker | searching | results | playing | connect
 let source = store.config.defaultSource;
 let queue = [];
 let history = [];
@@ -115,7 +114,7 @@ function activePlayer() {
 
 const LINK_TRACK_LIMIT = 100;
 
-let pickerTab = 'vibes';
+let pickerTab = 'describe';
 let vibesCursor = 0;
 let activityCursor = 0;
 let resultsCursor = 0;
@@ -225,9 +224,6 @@ function cycleThemeInApp(direction = 1) {
     return;
   }
 
-  if (state === 'search_input') {
-    promptSearch();
-  }
 }
 
 function enableRawKeys() {
@@ -300,17 +296,32 @@ function renderPlaying() {
 }
 
 function renderPicker() {
+  const needsConnect = source === 'spotify' && !spotifyReady();
+  const library = {
+    source,
+    favoritesCount: store.favorites.length,
+    recentsCount: store.recents.length,
+    sourceNote: needsConnect ? 'not connected yet · tab, then c to connect' : null,
+    needsConnect
+  };
+  if (pickerTab === 'describe') {
+    const screen = ui.header(source) + ui.describeTab({
+      text: vibeText,
+      examples: VIBE_EXAMPLES,
+      exampleIdx,
+      notice: vibeNotice,
+      ...library
+    });
+    process.stdout.write('\x1b[H' + screen.replace(/\n/g, '\x1b[K\n') + '\x1b[J');
+    return;
+  }
   ui.clear();
   process.stdout.write(ui.header(source));
   const cursor = pickerTab === 'vibes' ? vibesCursor : activityCursor;
   const items = pickerTab === 'vibes' ? CHANNELS : ACTIVITIES;
-  const needsConnect = source === 'spotify' && !spotifyReady();
   process.stdout.write(ui.picker(items, cursor, pickerTab, {
-    source,
-    favoritesCount: store.favorites.length,
-    recentsCount: store.recents.length,
-    sourceNote: needsConnect ? 'not connected yet · press c to connect' : null,
-    needsConnect
+    ...library,
+    sourceNote: needsConnect ? 'not connected yet · press c to connect' : null
   }));
 }
 
@@ -787,29 +798,85 @@ async function rerunCurrentQueryWithNextSource() {
   }
 }
 
+// Every "type something" path lands in the describe tab's text box.
 function promptSearch(notice = '') {
-  state = 'search_input';
   ui.stopVisualizer();
-  disableRawKeys();
-  ui.showCursor();
+  vibeNotice = notice;
+  pickerTab = 'describe';
+  showPicker();
+}
 
-  ui.clear();
-  process.stdout.write(ui.header(source) + notice);
+// ─── Describe tab ───────────────────────────────────────────────────────────
+// A text box on the home screen. Letters type here, so shortcuts live on the
+// vibes and sessions tabs.
 
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-  });
+const VIBE_EXAMPLES = [
+  'james bond intro music, salsa, working',
+  'rainy tokyo night drive',
+  'sunday morning coffee jazz',
+  'daft punk'
+];
 
-  rl.question(ui.searchPrompt(source), (answer) => {
-    rl.close();
-    const query = answer.trim();
-    if (!query) {
-      showPicker();
-      return;
-    }
-    void doSearch(query);
-  });
+let vibeText = '';
+let vibeNotice = '';
+let exampleIdx = -1;
+
+const PICKER_TABS = ['describe', 'vibes', 'activities'];
+
+function switchPickerTab(direction = 1) {
+  const idx = PICKER_TABS.indexOf(pickerTab);
+  pickerTab = PICKER_TABS[(idx + direction + PICKER_TABS.length) % PICKER_TABS.length];
+  renderPicker();
+}
+
+async function handleDescribeKey(key) {
+  if (key === '\t') return switchPickerTab(1);
+  if (key === '\x1b[Z') return switchPickerTab(-1);
+
+  if (key === '\r' || key === '\n') {
+    const query = vibeText.trim();
+    if (!query) return;
+    vibeNotice = '';
+    await doSearch(query);
+    return;
+  }
+
+  if (key === '\x7f' || key === '\b') {
+    vibeText = [...vibeText].slice(0, -1).join('');
+    exampleIdx = -1;
+    renderPicker();
+    return;
+  }
+
+  if (key === '\x1b' || key === '\x15') {
+    vibeText = '';
+    vibeNotice = '';
+    exampleIdx = -1;
+    renderPicker();
+    return;
+  }
+
+  if (key === '\x1b[A' || key === '\x1b[B') {
+    const step = key === '\x1b[B' ? 1 : -1;
+    exampleIdx = (exampleIdx + step + VIBE_EXAMPLES.length) % VIBE_EXAMPLES.length;
+    vibeText = VIBE_EXAMPLES[exampleIdx];
+    renderPicker();
+    return;
+  }
+
+  // Arrow left/right switch tabs only when the box is empty.
+  if ((key === '\x1b[C' || key === '\x1b[D') && !vibeText) {
+    return switchPickerTab(key === '\x1b[C' ? 1 : -1);
+  }
+  if (key.startsWith('\x1b')) return;
+
+  // Typed keys and pasted text; newlines inside a paste submit nothing.
+  const typed = key.replace(/[\x00-\x1f\x7f]/g, '');
+  if (typed) {
+    vibeText += typed;
+    exampleIdx = -1;
+    renderPicker();
+  }
 }
 
 process.stdin.on('data', async (input) => {
@@ -827,12 +894,14 @@ process.stdin.on('data', async (input) => {
     return;
   }
 
+  if (state === 'picker' && pickerTab === 'describe') {
+    await handleDescribeKey(key);
+    return;
+  }
+
   if (state === 'picker') {
-    if (key === '\t' || isLeft(key) || isRight(key)) {
-      pickerTab = pickerTab === 'vibes' ? 'activities' : 'vibes';
-      renderPicker();
-      return;
-    }
+    if (key === '\t' || isRight(key)) return switchPickerTab(1);
+    if (key === '\x1b[Z' || isLeft(key)) return switchPickerTab(-1);
 
     const items = pickerTab === 'vibes' ? CHANNELS : ACTIVITIES;
     const cursor = pickerTab === 'vibes' ? vibesCursor : activityCursor;
@@ -868,7 +937,8 @@ process.stdin.on('data', async (input) => {
     }
 
     if (key === '/') {
-      promptSearch();
+      pickerTab = 'describe';
+      renderPicker();
       return;
     }
 

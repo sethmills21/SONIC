@@ -93,7 +93,7 @@ macOS media keys work via Control Center.
 
 ## Describe a vibe
 
-Press `/` and type what you want in plain words: a mood, a scene, an artist, or a song. Three or more words count as a vibe. Sonic searches your words and a long-mix version at once, then puts sets you can work to (20+ minutes, or live) first. On Spotify, a vibe finds playlists.
+Sonic opens on the **describe** tab: a text box where you type what you want in plain words, like a mood, a scene, an artist, or a song. `↑` `↓` fill in examples, `Esc` clears, and `Tab` moves to vibes and sessions, where the single-key shortcuts live. `/` anywhere brings you back to the box. Three or more words count as a vibe. Sonic searches your words and a long-mix version at once, then puts sets you can work to (20+ minutes, or live) first. On Spotify, a vibe finds playlists.
 
 ## Themes
 
