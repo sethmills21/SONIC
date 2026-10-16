@@ -6,7 +6,7 @@ Sonic should stay fast, readable, and fun. Favor improvements that make the CLI 
 
 ## Local Setup
 
-1. Install Node.js 20+
+1. Install Node.js 22+
 2. Install `yt-dlp` and `mpv`
 3. Install dependencies
 

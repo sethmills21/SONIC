@@ -14,7 +14,6 @@
     "README.md",
     "CONTRIBUTING.md",
     "SECURITY.md",
-    "CLAUDE.md",
     "AGENTS.md"
   ],
   "scripts": {
@@ -24,7 +23,7 @@
     "doctor": "node ./bin/sonic.js doctor"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "repository": {
     "type": "git",
@@ -48,6 +47,6 @@
     "visualizer"
   ],
   "dependencies": {
-    "chalk": "^5.4.1"
+    "chalk": "^6.0.1"
   }
 }

@@ -14,7 +14,8 @@ Make Sonic feel like a real terminal product, not a code sketch. Favor changes t
 - curated vibes and activity presets
 - expressive terminal UI and visualizers
 - switchable curated themes with a persisted default
-- experimental SoundCloud search
+- SoundCloud and Mixcloud search
+- direct YouTube, SoundCloud, and Mixcloud link playback
 
 ## Commands
 
