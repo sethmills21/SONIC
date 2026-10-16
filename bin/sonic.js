@@ -18,6 +18,7 @@ import {
   verifyLogin
 } from '../lib/spotify.js';
 import { UI } from '../lib/ui.js';
+import { queryTerminalBackground } from '../lib/themes.js';
 import {
   CHANNELS, ACTIVITIES,
   getSuggestedChannel, getSuggestedActivity,
@@ -811,7 +812,11 @@ function promptSearch(notice = '') {
   });
 }
 
-process.stdin.on('data', async (key) => {
+process.stdin.on('data', async (input) => {
+  const key = String(input);
+  // A late reply to the background-color query is not a keypress.
+  if (key.startsWith('\x1b]')) return;
+
   if (key === '\x03') {
     cleanup(0);
     return;
@@ -1143,6 +1148,9 @@ async function main() {
     console.error(formatDependencyHelp(missingDependencies));
     process.exit(1);
   }
+
+  // Learn light vs dark before the first frame, so text never lands white on white.
+  if (store.config.colorMode === 'auto') await queryTerminalBackground();
 
   ui.hideCursor();
 
