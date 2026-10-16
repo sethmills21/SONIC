@@ -2,10 +2,21 @@
 
 import readline from 'node:readline';
 import { readFileSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
 
 import { search, SOURCES, parseSourceUrl, resolveUrl } from '../lib/search.js';
 import { Player } from '../lib/player.js';
-import { SpotifyPlayer, hasSpogo } from '../lib/spotify.js';
+import {
+  SpotifyPlayer,
+  SpotifySetupError,
+  detectBrowsers,
+  hasHomebrew,
+  hasSpogo,
+  importLogin,
+  isSpotifyConnected,
+  listDevices,
+  verifyLogin
+} from '../lib/spotify.js';
 import { UI } from '../lib/ui.js';
 import {
   CHANNELS, ACTIVITIES,
@@ -36,6 +47,7 @@ const packageJson = JSON.parse(
 const version = packageJson.version;
 const args = process.argv.slice(2);
 const doctorMode = args.includes('--doctor') || (args.length === 1 && args[0] === 'doctor');
+const connectMode = args.length === 1 && args[0] === 'connect';
 
 if (args.includes('--help') || args.includes('-h')) {
   printHelp(version);
@@ -64,9 +76,7 @@ let currentTrack = null;
 let currentQuery = '';
 let currentSearchOptions = {};
 let state = 'idle'; // idle | picker | searching | results | playing | search_input
-let source = availableSources().includes(store.config.defaultSource)
-  ? store.config.defaultSource
-  : 'youtube';
+let source = store.config.defaultSource;
 let queue = [];
 let history = [];
 let resultsMeta = {
@@ -90,9 +100,8 @@ if (args.includes('--sp') || args.includes('--spotify')) {
   source = 'spotify';
 }
 
-// Spotify joins the source cycle only once spogo is installed.
-function availableSources() {
-  return SOURCES.filter((name) => name !== 'spotify' || hasSpogo());
+function spotifyReady() {
+  return hasSpogo() && isSpotifyConnected();
 }
 
 function isSpotifyTrack() {
@@ -112,7 +121,7 @@ let resultsCursor = 0;
 
 const queryArgs = args
   .filter((arg) => !arg.startsWith('--'))
-  .filter((arg) => arg !== 'doctor')
+  .filter((arg) => arg !== 'doctor' && !(connectMode && arg === 'connect'))
   .join(' ')
   .trim();
 
@@ -185,9 +194,8 @@ function setSequenceFromList(list, index) {
 }
 
 function cycleSource() {
-  const sources = availableSources();
-  const idx = sources.indexOf(source);
-  source = sources[(idx + 1) % sources.length];
+  const idx = SOURCES.indexOf(source);
+  source = SOURCES[(idx + 1) % SOURCES.length];
   persistConfig({ defaultSource: source });
 }
 
@@ -295,10 +303,13 @@ function renderPicker() {
   process.stdout.write(ui.header(source));
   const cursor = pickerTab === 'vibes' ? vibesCursor : activityCursor;
   const items = pickerTab === 'vibes' ? CHANNELS : ACTIVITIES;
+  const needsConnect = source === 'spotify' && !spotifyReady();
   process.stdout.write(ui.picker(items, cursor, pickerTab, {
     source,
     favoritesCount: store.favorites.length,
-    recentsCount: store.recents.length
+    recentsCount: store.recents.length,
+    sourceNote: needsConnect ? 'not connected yet · press c to connect' : null,
+    needsConnect
   }));
 }
 
@@ -379,6 +390,10 @@ async function runWithLoader(tips, task) {
 }
 
 function showLoadFailure(label, err) {
+  if (err instanceof SpotifySetupError) {
+    showConnect({ error: err.message });
+    return;
+  }
   promptSearch(ui.notice(label, err.message));
 }
 
@@ -391,6 +406,14 @@ async function doSearch(query, { preset = false, label = null } = {}) {
 
   currentQuery = query;
   currentSearchOptions = { preset, label };
+
+  // Without a saved login, spogo falls back to reading the browser, which can
+  // raise a surprise Keychain prompt. Go to Connect instead.
+  if (source === 'spotify' && !spotifyReady()) {
+    showConnect({ error: 'connect spotify first, then pick again.' });
+    return;
+  }
+
   state = 'searching';
 
   const outcome = await runWithLoader([
@@ -462,6 +485,10 @@ async function playTrack(track) {
   enableRawKeys();
 
   const remote = hydrated.source === 'spotify';
+  if (remote && !spotifyReady()) {
+    showConnect({ error: 'connect spotify first, then pick again.' });
+    return;
+  }
   let frame = 0;
   let loadingStage = remote ? 'remote' : 'connecting';
   const loadingAnim = setInterval(() => {
@@ -505,7 +532,211 @@ async function playTrack(track) {
   } catch (err) {
     clearInterval(loadingAnim);
     if (state !== 'playing') return;
+    if (err instanceof SpotifySetupError) {
+      showConnect({ error: err.message });
+      return;
+    }
     promptSearch(ui.notice(remote ? 'spotify:' : 'playback failed:', err.message));
+  }
+}
+
+// ─── Spotify connect flow ───────────────────────────────────────────────────
+// Walks through install → login → device, checking each step for real.
+
+let connect = null;
+
+function showConnect({ error = null } = {}) {
+  ui.stopVisualizer();
+  state = 'connect';
+  connect = {
+    browsers: detectBrowsers(),
+    browserIdx: 0,
+    busy: null,
+    frame: 0,
+    timer: null,
+    message: null,
+    error,
+    verified: false,
+    devices: null
+  };
+  ui.hideCursor();
+  enableRawKeys();
+  ui.clear();
+  if (spotifyReady()) void runConnectTask('verify');
+  renderConnect();
+}
+
+function connectBrowser() {
+  return connect.browsers[connect.browserIdx];
+}
+
+function connectStepIndex() {
+  if (!hasSpogo()) return 0;
+  if (!isSpotifyConnected() || !connect.verified) return 1;
+  if (!connect.devices?.length) return 2;
+  return 3;
+}
+
+function renderConnect() {
+  if (state !== 'connect') return;
+  const browser = connectBrowser();
+  const current = connectStepIndex();
+  const busyStep = { install: 0, import: 1, verify: 1, devices: 2 }[connect.busy];
+  const stepState = (i) => (busyStep === i ? 'busy' : i < current ? 'done' : i === current ? 'current' : 'todo');
+  const deviceNames = connect.devices?.map((d) => d.name).join(', ');
+
+  const steps = [
+    {
+      label: 'install spogo, the spotify helper sonic drives',
+      detail: hasHomebrew()
+        ? 'press enter to install it with homebrew.'
+        : 'install go, then run: go install github.com/steipete/spogo/cmd/spogo@latest',
+      doneDetail: 'installed',
+      state: stepState(0)
+    },
+    {
+      label: `connect your spotify login from ${browser.label}`,
+      detail: connect.busy === 'import'
+        ? `reading ${browser.label}... if macOS asks about saved logins, click "Always Allow".`
+        : connect.busy === 'verify'
+          ? 'checking that search works...'
+          : `log in at open.spotify.com in ${browser.label} first (press o).\nthen press enter. macOS asks to share saved logins: click "Always Allow".`,
+      doneDetail: 'connected, search works',
+      state: stepState(1)
+    },
+    {
+      label: 'open spotify where you want to hear it',
+      detail: deviceNames
+        ? `found: ${deviceNames}`
+        : 'the desktop app, your phone, or the web player (press o). then press enter.',
+      doneDetail: deviceNames ? `found: ${deviceNames}` : null,
+      state: stepState(2)
+    }
+  ];
+
+  const done = current === 3;
+  const keys = done
+    ? [['enter', 'start listening'], ['esc', 'back'], ['q', 'quit']]
+    : [
+      ['enter', ['install', 'connect', 'check devices'][current]],
+      current >= 1 ? ['o', current === 1 ? `open spotify in ${browser.label}` : 'open web player'] : null,
+      connect.browsers.length > 1 && current === 1 ? ['b', 'other browser'] : null,
+      current === 2 ? ['s', 'skip for now'] : null,
+      ['esc', 'back'],
+      ['q', 'quit']
+    ];
+
+  const screen = ui.header('spotify') + ui.connectScreen({
+    steps,
+    browser,
+    browsers: current === 1 ? connect.browsers : [],
+    busyFrame: connect.frame,
+    message: done ? 'spotify is connected.' : connect.message,
+    error: connect.error,
+    keys
+  });
+  process.stdout.write('\x1b[H' + screen.replace(/\n/g, '\x1b[K\n') + '\x1b[J');
+}
+
+async function runConnectTask(task) {
+  if (connect.busy) return;
+  connect.busy = task;
+  connect.error = null;
+  connect.message = null;
+  connect.timer = setInterval(() => { connect.frame++; renderConnect(); }, 80);
+  try {
+    if (task === 'import') {
+      await importLogin(connectBrowser());
+      task = 'verify';
+      connect.busy = 'verify';
+    }
+    if (task === 'verify') {
+      await verifyLogin();
+      connect.verified = true;
+      task = 'devices';
+      connect.busy = 'devices';
+    }
+    if (task === 'devices') {
+      connect.devices = await listDevices();
+      if (!connect.devices.length) {
+        connect.error = 'no spotify device is open yet. open spotify somewhere, then press enter.';
+      }
+    }
+  } catch (err) {
+    connect.error = err.message;
+  } finally {
+    clearInterval(connect.timer);
+    connect.busy = null;
+    renderConnect();
+  }
+}
+
+// Homebrew prints its own progress, so hand it the terminal for the install.
+function installSpogo() {
+  if (!hasHomebrew()) return;
+  disableRawKeys();
+  ui.showCursor();
+  ui.clear();
+  process.stdout.write('installing spogo with homebrew...\n\n');
+  const result = spawnSync('brew', ['install', 'steipete/tap/spogo'], { stdio: 'inherit' });
+  ui.hideCursor();
+  enableRawKeys();
+  ui.clear();
+  if (!hasSpogo({ recheck: true })) {
+    connect.error = result.status === 0
+      ? 'spogo installed, but this terminal cannot find it yet. open a new terminal and run: sonic connect'
+      : `homebrew could not install spogo (exit ${result.status}). run: brew install steipete/tap/spogo`;
+  }
+  renderConnect();
+}
+
+function openSpotifyWeb() {
+  const browser = connectBrowser();
+  const url = 'https://open.spotify.com';
+  if (process.platform === 'darwin') {
+    spawn('open', ['-a', browser.app, url], { stdio: 'ignore', detached: true }).unref();
+    return;
+  }
+  void openExternal(url).catch(() => {});
+}
+
+function finishConnect() {
+  source = 'spotify';
+  persistConfig({ defaultSource: source });
+  showPicker();
+}
+
+async function handleConnectKey(key) {
+  if (key === 'q') {
+    cleanup(0);
+    return;
+  }
+  if (key === '\x1b') {
+    showPicker();
+    return;
+  }
+  if (connect.busy) return;
+
+  const current = connectStepIndex();
+  if (key === '\r' || key === '\n') {
+    if (current === 0) installSpogo();
+    else if (current === 1) await runConnectTask('import');
+    else if (current === 2) await runConnectTask('devices');
+    else finishConnect();
+    return;
+  }
+  if (key === 'o' && current >= 1) {
+    openSpotifyWeb();
+    return;
+  }
+  if (key === 'b' && current === 1 && connect.browsers.length > 1) {
+    connect.browserIdx = (connect.browserIdx + 1) % connect.browsers.length;
+    connect.error = null;
+    renderConnect();
+    return;
+  }
+  if (key === 's' && current === 2) {
+    finishConnect();
   }
 }
 
@@ -586,6 +817,11 @@ process.stdin.on('data', async (key) => {
     return;
   }
 
+  if (state === 'connect') {
+    await handleConnectKey(key);
+    return;
+  }
+
   if (state === 'picker') {
     if (key === '\t' || isLeft(key) || isRight(key)) {
       pickerTab = pickerTab === 'vibes' ? 'activities' : 'vibes';
@@ -638,6 +874,11 @@ process.stdin.on('data', async (key) => {
 
     if (key === 'r') {
       showRecents();
+      return;
+    }
+
+    if (key === 'c') {
+      showConnect();
       return;
     }
 
@@ -871,6 +1112,7 @@ process.stdout.on('resize', () => {
   if (state === 'picker') renderPicker();
   else if (state === 'results') renderResultsList();
   else if (state === 'playing') renderPlaying();
+  else if (state === 'connect') renderConnect();
 });
 
 player.on('ended', async () => {
@@ -903,6 +1145,11 @@ async function main() {
   }
 
   ui.hideCursor();
+
+  if (connectMode) {
+    showConnect();
+    return;
+  }
 
   if (queryArgs) {
     const channel = resolveChannel(queryArgs);
