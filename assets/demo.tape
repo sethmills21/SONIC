@@ -1,14 +1,15 @@
 # Sonic CLI Demo
-# Run: vhs assets/demo.tape
+# Run from the repo root: vhs assets/demo.tape
+# Tip: set "volume": 0 in ~/.config/sonic/store.json while recording.
 
 Output assets/demo.gif
 
 Set Shell zsh
-Set FontFamily "JetBrains Mono"
+Set FontFamily "Menlo"
 Set FontSize 15
-Set Width 900
-Set Height 550
-Set Padding 16
+Set Width 1000
+Set Height 820
+Set Padding 20
 Set Framerate 15
 Set TypingSpeed 50ms
 Set Theme "Catppuccin Mocha"
@@ -23,42 +24,40 @@ Down
 Sleep 400ms
 Down
 Sleep 400ms
-Down
-Sleep 400ms
+Up
+Sleep 500ms
 
-# Switch tab and back
+# Peek at sessions and back
 Tab
-Sleep 1s
+Sleep 1.2s
 Tab
 Sleep 800ms
 
-# Cycle themes
-Type "t"
-Sleep 1s
-Type "t"
-Sleep 1s
-
-# Search
-Type "/"
-Sleep 500ms
-Type "lofi chill beats"
-Sleep 300ms
-Enter
-Sleep 4s
-
-# Play first result
-Enter
+# Quick pick: synthwave
+Type "8"
 Sleep 8s
 
-# Switch visualizer
-Type "v"
-Sleep 3s
-Type "v"
-Sleep 3s
+# Play the first mix
+Enter
+Sleep 10s
 
-# Cycle theme during playback
-Type "t"
+# Visualizers
+Type "v"
 Sleep 2.5s
+Type "v"
+Sleep 2.5s
+Type "v"
+Sleep 2.5s
+Type "v"
+Sleep 2.5s
+
+# Themes
+Type "t"
+Sleep 2s
+Type "t"
+Sleep 2s
+Type "v"
+Sleep 2s
 
 # Quit
 Type "q"
