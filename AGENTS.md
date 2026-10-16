@@ -1,6 +1,6 @@
-# AGENTS.md
+# Sonic
 
-Guidance for coding agents working in this repository. Keep this aligned with `CLAUDE.md`.
+Guidance for coding agents working in this repository.
 
 ## Mission
 
@@ -54,7 +54,7 @@ lib/themes.js     theme registry and palette helpers
 - keep docs in sync with real behavior
 - prefer YouTube-first improvements over speculative multi-service work
 - if you add another service, explain the API/auth/legal model in `README.md`
-- keep project-level `CLAUDE.md` and `AGENTS.md` versioned in git; do not hide them in `.gitignore`
+- keep the project-level `AGENTS.md` versioned in git; do not hide it in `.gitignore`
 - if you touch theme work, keep the identity strong across the full TUI, not just the header
 
 ## Inspiration
