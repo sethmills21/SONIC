@@ -15,7 +15,8 @@ Make Sonic feel like a real terminal product, not a code sketch. Favor changes t
 - expressive terminal UI and visualizers
 - switchable curated themes with a persisted default
 - SoundCloud and Mixcloud search
-- direct YouTube, SoundCloud, and Mixcloud link playback
+- direct YouTube, SoundCloud, Mixcloud, and Spotify link playback
+- optional Spotify remote control through `spogo` (audio plays in a Spotify app, not mpv)
 
 ## Commands
 
@@ -32,6 +33,7 @@ System dependencies:
 
 ```bash
 brew install yt-dlp mpv
+brew install steipete/tap/spogo   # optional, for Spotify
 ```
 
 ## File Map
@@ -40,6 +42,7 @@ brew install yt-dlp mpv
 bin/sonic.js      CLI state machine
 lib/search.js     search adapter
 lib/player.js     mpv controller
+lib/spotify.js    Spotify search and remote control via spogo
 lib/channels.js   content presets
 lib/ui.js         TUI rendering
 lib/system.js     system checks and safe URL opening

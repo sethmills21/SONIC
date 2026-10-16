@@ -1,7 +1,7 @@
 {
-  "name": "sonic-cli",
+  "name": "sonic-tui",
   "version": "0.1.0",
-  "description": "A terminal music player with YouTube, SoundCloud, and Mixcloud — powered by mpv and yt-dlp",
+  "description": "A vibes-first terminal music player for YouTube, SoundCloud, Mixcloud, and Spotify",
   "license": "MIT",
   "type": "module",
   "author": "Seth Mills",
@@ -18,7 +18,7 @@
   ],
   "scripts": {
     "start": "node ./bin/sonic.js",
-    "check": "node --check bin/sonic.js && node --check lib/search.js && node --check lib/player.js && node --check lib/channels.js && node --check lib/ui.js && node --check lib/system.js && node --check lib/store.js && node --check lib/themes.js",
+    "check": "node --check bin/sonic.js && node --check lib/search.js && node --check lib/player.js && node --check lib/spotify.js && node --check lib/channels.js && node --check lib/ui.js && node --check lib/system.js && node --check lib/store.js && node --check lib/themes.js",
     "help": "node ./bin/sonic.js --help",
     "doctor": "node ./bin/sonic.js doctor"
   },
@@ -42,6 +42,7 @@
     "youtube",
     "soundcloud",
     "mixcloud",
+    "spotify",
     "mpv",
     "yt-dlp",
     "visualizer"

@@ -6,13 +6,13 @@
 
 <p align="center">
   SONIC is a vibes-based CLI music player to join alongside your other terminal tabs<br>
-  Supports YouTube, Mixcloud, and Soundcloud as of now.
+  Supports YouTube, SoundCloud, Mixcloud, and Spotify.
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/node-%3E%3D22-green?style=flat-square&logo=node.js" alt="Node">
   <img src="https://img.shields.io/badge/license-MIT-yellow?style=flat-square" alt="License">
-  <img src="https://img.shields.io/badge/sources-3-purple?style=flat-square" alt="Sources">
+  <img src="https://img.shields.io/badge/sources-4-purple?style=flat-square" alt="Sources">
 </p>
 
 ## Quick Start
@@ -58,6 +58,7 @@ sonic                            # open the picker
 sonic "deep house"               # search and play
 sonic --soundcloud "liquid dnb"  # search SoundCloud
 sonic --mixcloud "techno mix"    # search Mixcloud
+sonic --spotify "daft punk"      # search Spotify
 sonic "https://youtu.be/..."     # play a link (quote it)
 sonic doctor                     # check setup
 sonic --help                     # full help
@@ -71,6 +72,7 @@ sonic --help                     # full help
 | `Space` | — | Pause / resume |
 | `/` | Search | Search (stops playback) |
 | `j` `k` / arrows | Move through lists | — |
+| `1`–`0` | Quick pick a vibe | — |
 | `Tab` / `Left` `Right` | Switch tabs | — |
 | `n` / `p` | — | Next / previous track |
 | `f` | Open favorites | Favorite track |
@@ -97,11 +99,28 @@ Five modes: **Bars**, **Tape**, **Wave**, **Rain**, **Flame**. Press `v` during 
 
 ## Sources
 
-YouTube, SoundCloud, and Mixcloud. All use `mpv` for playback and require no auth. Press `m` to cycle.
+YouTube, SoundCloud, and Mixcloud play through `mpv` and need no account. Press `m` to cycle. Live streams show a **LIVE** badge instead of a fake length.
+
+### Spotify
+
+Spotify is optional. Sonic acts as a remote: audio plays in a Spotify app (desktop, phone, or web player), and Sonic searches, starts, skips, seeks, and shows what is playing.
+
+```bash
+brew install steipete/tap/spogo           # Spotify CLI that Sonic drives
+# log in at https://open.spotify.com in Chrome, then:
+spogo auth import --browser chrome        # one-time; copies your Spotify session cookies
+sonic --spotify "daft punk"
+```
+
+- **Vibes and sessions** open Spotify playlists. **Search** finds tracks. Spotify links (`open.spotify.com/...` or `spotify:` URIs) play directly.
+- **How auth works:** [spogo](https://github.com/steipete/spogo) uses your own Spotify web session cookies, stored locally. Sonic never sees or stores your password, and no developer app is needed.
+- **Premium:** Spotify only allows remote playback control for Premium accounts. On macOS with the Spotify desktop app open, spogo can drive the app directly instead.
+- Spotify shows up in the `m` cycle once `spogo` is installed. `sonic doctor` reports whether you are logged in.
+- Unofficial: this uses Spotify's web player endpoints the same way your browser does. Use it with your own account.
 
 ## Requirements
 
-**Node.js** 22+ &nbsp;&middot;&nbsp; **yt-dlp** &nbsp;&middot;&nbsp; **mpv** &nbsp;&middot;&nbsp; macOS or Linux
+**Node.js** 22+ &nbsp;&middot;&nbsp; **yt-dlp** &nbsp;&middot;&nbsp; **mpv** &nbsp;&middot;&nbsp; macOS or Linux &nbsp;&middot;&nbsp; optional: **spogo** for Spotify
 
 ## Contributing
 
