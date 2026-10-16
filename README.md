@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/node-%3E%3D20-green?style=flat-square&logo=node.js" alt="Node">
+  <img src="https://img.shields.io/badge/node-%3E%3D22-green?style=flat-square&logo=node.js" alt="Node">
   <img src="https://img.shields.io/badge/license-MIT-yellow?style=flat-square" alt="License">
   <img src="https://img.shields.io/badge/sources-3-purple?style=flat-square" alt="Sources">
 </p>
@@ -27,7 +27,7 @@ curl -fsSL https://raw.githubusercontent.com/sethmills21/sonic/main/install.sh |
 <summary><strong>npm</strong></summary>
 
 ```bash
-npm install -g sonic-cli
+npm install -g github:sethmills21/SONIC
 sonic "lofi"
 ```
 </details>
@@ -58,6 +58,7 @@ sonic                            # open the picker
 sonic "deep house"               # search and play
 sonic --soundcloud "liquid dnb"  # search SoundCloud
 sonic --mixcloud "techno mix"    # search Mixcloud
+sonic "https://youtu.be/..."     # play a link (quote it)
 sonic doctor                     # check setup
 sonic --help                     # full help
 ```
@@ -100,7 +101,7 @@ YouTube, SoundCloud, and Mixcloud. All use `mpv` for playback and require no aut
 
 ## Requirements
 
-**Node.js** 20+ &nbsp;&middot;&nbsp; **yt-dlp** &nbsp;&middot;&nbsp; **mpv** &nbsp;&middot;&nbsp; macOS or Linux
+**Node.js** 22+ &nbsp;&middot;&nbsp; **yt-dlp** &nbsp;&middot;&nbsp; **mpv** &nbsp;&middot;&nbsp; macOS or Linux
 
 ## Contributing
 
@@ -113,7 +114,7 @@ MIT
 ---
 
 <p align="center">
-  Cooked up by <a href="https://github.com/sethmills21">Seth Miller</a> and <a href="https://claude.ai/code">Claude Code</a>
+  Cooked up by <a href="https://github.com/sethmills21">Seth Mills</a> and <a href="https://claude.ai/code">Claude Code</a>
 </p>
 
 <p align="center">

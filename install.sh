@@ -35,13 +35,13 @@ fi
 info "Checking Node.js..."
 if command -v node &>/dev/null; then
   NODE_VERSION=$(node -v | sed 's/v//' | cut -d. -f1)
-  if [[ "$NODE_VERSION" -ge 20 ]]; then
+  if [[ "$NODE_VERSION" -ge 22 ]]; then
     ok "Node.js $(node -v)"
   else
-    fail "Node.js 20+ required (found $(node -v)). Update at https://nodejs.org"
+    fail "Node.js 22+ required (found $(node -v)). Update at https://nodejs.org"
   fi
 else
-  fail "Node.js not found. Install 20+ from https://nodejs.org"
+  fail "Node.js not found. Install 22+ from https://nodejs.org"
 fi
 
 # --- Check / install yt-dlp ---
