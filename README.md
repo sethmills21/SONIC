@@ -59,6 +59,7 @@ sonic "deep house"               # search and play
 sonic --soundcloud "liquid dnb"  # search SoundCloud
 sonic --mixcloud "techno mix"    # search Mixcloud
 sonic --spotify "daft punk"      # search Spotify
+sonic connect                    # connect Spotify, step by step
 sonic "https://youtu.be/..."     # play a link (quote it)
 sonic doctor                     # check setup
 sonic --help                     # full help
@@ -106,16 +107,15 @@ YouTube, SoundCloud, and Mixcloud play through `mpv` and need no account. Press 
 Spotify is optional. Sonic acts as a remote: audio plays in a Spotify app (desktop, phone, or web player), and Sonic searches, starts, skips, seeks, and shows what is playing.
 
 ```bash
-brew install steipete/tap/spogo           # Spotify CLI that Sonic drives
-# log in at https://open.spotify.com in Chrome, then:
-spogo auth import --browser chrome        # one-time; copies your Spotify session cookies
-sonic --spotify "daft punk"
+sonic connect        # or press c on the home screen
 ```
+
+Connect walks you through three checked steps: install [spogo](https://github.com/steipete/spogo) (the Spotify CLI Sonic drives), bring over your Spotify login from your browser, and find a device to play on. macOS asks once to share your browser's saved logins; click **Always Allow**.
 
 - **Vibes and sessions** open Spotify playlists. **Search** finds tracks. Spotify links (`open.spotify.com/...` or `spotify:` URIs) play directly.
 - **How auth works:** [spogo](https://github.com/steipete/spogo) uses your own Spotify web session cookies, stored locally. Sonic never sees or stores your password, and no developer app is needed.
 - **Premium:** Spotify only allows remote playback control for Premium accounts. On macOS with the Spotify desktop app open, spogo can drive the app directly instead.
-- Spotify shows up in the `m` cycle once `spogo` is installed. `sonic doctor` reports whether you are logged in.
+- Press `m` to switch to Spotify any time. If it is not connected yet, Sonic opens Connect. `sonic doctor` reports whether you are logged in.
 - Unofficial: this uses Spotify's web player endpoints the same way your browser does. Use it with your own account.
 
 ## Requirements
