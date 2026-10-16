@@ -137,6 +137,21 @@ function cleanup(exitCode = 0) {
   ]).then(() => process.exit(exitCode));
 }
 
+// A crash must still stop the music and give the terminal back.
+function crash(err) {
+  try { ui.cleanup(); } catch {}
+  if (player.proc) {
+    try { player.proc.kill('SIGKILL'); } catch {}
+  }
+  if (process.stdin.isTTY && process.stdin.isRaw) process.stdin.setRawMode(false);
+  console.error(`\nsonic hit a bug and stopped: ${err?.message || err}`);
+  console.error('please report it: https://github.com/sethmills21/sonic/issues');
+  if (process.env.SONIC_DEBUG) console.error(err?.stack);
+  process.exit(1);
+}
+
+process.on('uncaughtException', crash);
+process.on('unhandledRejection', crash);
 process.on('SIGINT', () => cleanup(0));
 process.on('SIGTERM', () => cleanup(0));
 process.on('exit', () => {
