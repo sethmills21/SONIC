@@ -430,7 +430,7 @@ async function doSearch(query, { preset = false, label = null } = {}) {
   }
 
   setResultsView(outcome.value, {
-    title: 'search results',
+    title: preset ? 'search results' : 'your vibe',
     subtitle: `${source} · ${label || query}`,
     kind: 'search',
     emptyMessage: `no ${source} results for “${label || query}”. press m to try another source.`

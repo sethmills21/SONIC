@@ -56,6 +56,7 @@ sonic doctor
 ```bash
 sonic                            # open the picker
 sonic "deep house"               # search and play
+sonic "james bond intro music, working"   # describe a vibe
 sonic --soundcloud "liquid dnb"  # search SoundCloud
 sonic --mixcloud "techno mix"    # search Mixcloud
 sonic --spotify "daft punk"      # search Spotify
@@ -71,7 +72,7 @@ sonic --help                     # full help
 | --- | --- | --- |
 | `Enter` | Play selected | — |
 | `Space` | — | Pause / resume |
-| `/` | Search | Search (stops playback) |
+| `/` | Describe a vibe | New vibe (stops playback) |
 | `j` `k` / arrows | Move through lists | — |
 | `1`–`0` | Quick pick a vibe | — |
 | `Tab` / `Left` `Right` | Switch tabs | — |
@@ -89,6 +90,10 @@ sonic --help                     # full help
 | `q` | Quit | Quit |
 
 macOS media keys work via Control Center.
+
+## Describe a vibe
+
+Press `/` and type what you want in plain words: a mood, a scene, an artist, or a song. Three or more words count as a vibe. Sonic searches your words and a long-mix version at once, then puts sets you can work to (20+ minutes, or live) first. On Spotify, a vibe finds playlists.
 
 ## Themes
 
