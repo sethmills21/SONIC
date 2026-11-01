@@ -2,10 +2,6 @@
 
 Guidance for coding agents working in this repository.
 
-## Mission
-
-Make Sonic feel like a real terminal product, not a code sketch. Favor changes that improve setup, safety, playback reliability, and the quality of the keyboard-driven UX.
-
 ## Current Scope
 
 - YouTube-first CLI music player
@@ -59,34 +55,6 @@ lib/themes.js     theme registry and palette helpers
 - prefer YouTube-first improvements over speculative multi-service work
 - if you add another service, explain the API/auth/legal model in `README.md`
 - if you touch theme work, keep the identity strong across the full TUI, not just the header
-
-## Inspiration
-
-Reference set for CLI/TUI quality:
-
-- [`googleworkspace/cli`](https://github.com/googleworkspace/cli): installation, prerequisites, agent-ready framing, structured output.
-- [`cli/cli`](https://github.com/cli/cli): command ergonomics, help UX, and polished distribution posture.
-- [`alexknowshtml/api2cli`](https://github.com/alexknowshtml/api2cli): dual human/agent command design and self-documenting CLI patterns.
-- [`asc`](https://asccli.sh/): focused workflow automation with a strong install/onboarding surface.
-- [`Polymarket/polymarket-cli`](https://github.com/Polymarket/polymarket-cli): clear warnings, Homebrew install, scriptable terminal product design.
-- [`google-gemini/gemini-cli`](https://github.com/google-gemini/gemini-cli) and [`superagent-ai/grok-cli`](https://github.com/superagent-ai/grok-cli): examples of modern agent CLI presentation.
-- [`rothgar/awesome-tuis`](https://github.com/rothgar/awesome-tuis): broad TUI idea bank.
-
-What to steal for Sonic:
-
-1. excellent `--help`
-2. clean install paths
-3. obvious warnings around risky behavior
-4. strong README and release posture
-5. future-friendly script/agent integration without sacrificing the live TUI
-
-## Preferred Roadmap
-
-1. queue, favorites, recents, config
-2. doctor/setup diagnostics
-3. session integration
-4. cleaner service adapter boundaries
-5. broader platform support and release automation
 
 ## Validation
 
